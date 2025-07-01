@@ -22,8 +22,6 @@
   </pre>
   
   <h3>🚀 The Rails of the JavaScript world, powered by Bun</h3>
-
-<a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>  
   
   <p>
     <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
