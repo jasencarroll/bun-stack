@@ -1,0 +1,11 @@
+node_modules
+.create-bun-app
+*.lock
+bun.lockb
+dist
+build
+.next
+.cache
+coverage
+.env*
+*.log
