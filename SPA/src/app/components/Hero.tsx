@@ -3,7 +3,7 @@ import { ArrowDownIcon, CheckIcon, DocumentDuplicateIcon } from "@heroicons/reac
 
 export function Hero() {
   const [copied, setCopied] = React.useState(false);
-  const command = "bun create jasencarroll/bun-stack my-app";
+  const command = "bunx create-bun-stack";
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(command);
