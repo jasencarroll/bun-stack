@@ -232,10 +232,6 @@ bun run test
 
 ## 📚 Documentation
 
-- [Getting Started Guide](docs/getting-started.md)
-- [Architecture Overview](docs/architecture.md)
-- [Adding Features](docs/adding-features.md)
-- [Deployment Guide](docs/deployment.md)
 - [CLAUDE.md](CLAUDE.md) - Implementation details
 
 ## 🐛 Troubleshooting
@@ -282,15 +278,6 @@ bun test
 
 </details>
 
-## 🎯 Roadmap
-
-- [ ] Official release
-- [ ] GitHub template repository
-- [ ] More database adapters (MySQL, MongoDB)
-- [ ] GraphQL option
-- [ ] Mobile app support (React Native)
-- [ ] Admin panel generator
-- [ ] More deployment guides
 
 ## 📄 License
 

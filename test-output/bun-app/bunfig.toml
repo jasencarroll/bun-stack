@@ -1,5 +1,0 @@
-# Bun configuration
-[test]
-preload = ["./tests/setup.ts"]
-# Run tests sequentially to avoid conflicts
-smol = true
