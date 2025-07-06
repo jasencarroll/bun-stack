@@ -41,6 +41,9 @@ export function Navigation() {
               <button onClick={() => handleSectionLink('examples')} className="hover:text-bun-accent transition-colors">
                 Examples
               </button>
+              <button onClick={() => handleSectionLink('philosophy')} className="hover:text-bun-accent transition-colors">
+                Mission
+              </button>
               <button onClick={() => handleSectionLink('contact')} className="hover:text-bun-accent transition-colors">
                 Contact
               </button>
@@ -100,6 +103,9 @@ export function Navigation() {
             </button>
             <button onClick={() => { handleSectionLink('examples'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
               Examples
+            </button>
+            <button onClick={() => { handleSectionLink('philosophy'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
+              Mission
             </button>
             <button onClick={() => { handleSectionLink('contact'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
               Contact

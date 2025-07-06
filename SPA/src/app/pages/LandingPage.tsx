@@ -6,6 +6,7 @@ import { CodeExamples } from "../components/CodeExamples";
 import { AboutProject } from "../components/AboutProject";
 import { Roadmap } from "../components/Roadmap";
 import { GetStarted } from "../components/GetStarted";
+import { Philosophy } from "../components/Philosophy";
 import { ContactForm } from "../components/ContactForm";
 import { Footer } from "../components/Footer";
 import { Navigation } from "../components/Navigation";
@@ -30,6 +31,7 @@ export function LandingPage() {
         <Comparison />
         <CodeExamples />
         <Roadmap />
+        <Philosophy />
         <ContactForm />
         <GetStarted />
         <Footer />
