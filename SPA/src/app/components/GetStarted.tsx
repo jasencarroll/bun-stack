@@ -74,16 +74,49 @@ export function GetStarted() {
           </div>
         </div>
 
-        <div className="text-center">
-          <p className="text-gray-400 mb-4">Requires Bun v1.0 or later</p>
+        <div className="text-center space-y-6">
+          <p className="text-gray-400">Requires Bun v1.0 or later</p>
           <a
             href="https://bun.sh/docs/installation"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-bun-accent hover:underline"
+            className="text-bun-accent hover:underline inline-block"
           >
             Don't have Bun? Install it here →
           </a>
+          
+          <div className="pt-8 border-t border-gray-800">
+            <p className="text-gray-400 mb-4">
+              Built to accelerate your development workflow
+            </p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <a
+                href="https://github.com/jasencarroll/create-bun-stack"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-lg hover:bg-white/10 transition-all"
+              >
+                <span>⭐</span>
+                <span>Star on GitHub</span>
+              </a>
+              <a
+                href="/docs"
+                className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-lg hover:bg-white/10 transition-all"
+              >
+                <span>📚</span>
+                <span>Read the Docs</span>
+              </a>
+              <a
+                href="https://jasenc.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-bun-accent/10 text-bun-accent px-4 py-2 rounded-lg hover:bg-bun-accent/20 transition-all"
+              >
+                <span>👤</span>
+                <span>Meet the Creator</span>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>

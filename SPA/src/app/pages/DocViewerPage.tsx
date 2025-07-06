@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DocsContent } from "../components/docs/DocsContent";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { SEO } from "../components/SEO";
+import { StructuredData } from "../components/StructuredData";
 
 interface DocData {
   meta: {
@@ -100,16 +102,33 @@ export function DocViewerPage() {
   }
 
   return (
-    <div>
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-bun-light sm:text-4xl">
-          {doc.meta.title}
-        </h1>
-        {doc.meta.description && (
-          <p className="mt-2 text-lg leading-8 text-bun-light/70">{doc.meta.description}</p>
-        )}
-      </header>
-      <DocsContent html={doc.html || ""} headings={doc.headings || []} />
-    </div>
+    <>
+      <SEO
+        title={doc.meta.title}
+        description={doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`}
+        url={`https://bun-stack.jasenc.dev/docs/${slug ? `${category}/${slug}` : category}`}
+      />
+      <StructuredData 
+        type="Article" 
+        customData={{
+          title: doc.meta.title,
+          description: doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`,
+          url: `https://bun-stack.jasenc.dev/docs/${slug ? `${category}/${slug}` : category}`,
+          datePublished: "2025-07-06",
+          dateModified: "2025-07-06"
+        }}
+      />
+      <div>
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-bun-light sm:text-4xl">
+            {doc.meta.title}
+          </h1>
+          {doc.meta.description && (
+            <p className="mt-2 text-lg leading-8 text-bun-light/70">{doc.meta.description}</p>
+          )}
+        </header>
+        <DocsContent html={doc.html || ""} headings={doc.headings || []} />
+      </div>
+    </>
   );
 }

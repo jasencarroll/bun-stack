@@ -11,33 +11,33 @@ import {
 const features = [
   {
     icon: BoltIcon,
-    title: "Blazing Fast",
-    description: "Powered by Bun's lightning-fast runtime. Start your server in <10ms.",
+    title: "10x Faster Setup",
+    description: "Powered by Bun's lightning-fast runtime. Install dependencies 10x faster than npm. Start your server in <10ms.",
   },
   {
     icon: CubeIcon,
-    title: "Fullstack Ready",
-    description: "Frontend, backend, database, and auth configured out of the box.",
+    title: "Full-Stack Execution",
+    description: "Frontend to infrastructure - everything configured. Reduces project setup from hours to seconds, enforcing best practices across teams.",
   },
   {
     icon: ShieldCheckIcon,
-    title: "Security First",
-    description: "CSRF protection, secure headers, and JWT auth built-in.",
+    title: "Enterprise-Ready Security",
+    description: "CSRF protection, secure headers, and JWT auth built-in. Meet compliance requirements without the configuration overhead.",
   },
   {
     icon: CircleStackIcon,
-    title: "Dual Database",
-    description: "PostgreSQL for production, SQLite for development. Zero config.",
+    title: "Flexible Architecture",
+    description: "PostgreSQL for production, SQLite for development. Easily extensible for GraphQL, WebSockets, or custom solutions.",
   },
   {
     icon: BeakerIcon,
-    title: "Testing Included",
-    description: "Integration tests that actually work. No mocking needed.",
+    title: "Quality Assurance",
+    description: "Integration tests that actually work. Reduce QA cycles and improve team confidence with pre-configured testing.",
   },
   {
     icon: SparklesIcon,
-    title: "Modern DX",
-    description: "Hot reload, TypeScript, and all the tools you love.",
+    title: "Developer Productivity",
+    description: "Hot reload, TypeScript, and modern tooling. Onboard new team members in minutes, not days.",
   },
 ];
 

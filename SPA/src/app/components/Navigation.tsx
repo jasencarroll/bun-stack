@@ -52,6 +52,14 @@ export function Navigation() {
               >
                 GitHub
               </a>
+              <a
+                href="https://jasenc.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-bun-accent transition-colors"
+              >
+                Portfolio
+              </a>
               <button
                 onClick={() => handleSectionLink('get-started')}
                 className="bg-bun-accent text-bun-dark px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
@@ -102,6 +110,13 @@ export function Navigation() {
               onClick={() => setIsOpen(false)}
             >
               GitHub
+            </a>
+            <a
+              href="https://jasenc.dev"
+              className="block px-3 py-2 hover:text-bun-accent transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              Portfolio
             </a>
             <button
               onClick={() => { handleSectionLink('get-started'); setIsOpen(false); }}

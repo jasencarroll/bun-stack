@@ -61,9 +61,15 @@ export function Hero() {
           The <span className="gradient-text">Rails</span> of the JavaScript world
         </h1>
 
-        <p className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+        <p className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-4 max-w-3xl mx-auto">
           Build production-ready fullstack apps in seconds, not hours. Convention over configuration
           meets modern JavaScript.
+        </p>
+        
+        <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
+          Identified the gap between Rails productivity and modern JS tooling.<br />
+          Perfect for MVPs, hackathons, and rapid prototyping.<br />
+          <span className="text-bun-accent"> 30-second setup instead of 30 minutes.</span>
         </p>
 
         <div className="flex justify-center mb-12">
@@ -93,7 +99,7 @@ export function Hero() {
         </div>
 
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
           <a
             href="#get-started"
             className="bg-bun-accent text-bun-dark px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-600 transition-colors"
@@ -108,6 +114,11 @@ export function Hero() {
           >
             View on GitHub
           </a>
+        </div>
+        
+        <div className="text-sm text-gray-500">
+          Created by <a href="https://jasenc.dev" className="text-bun-accent hover:text-purple-400 transition-colors">an engineer with AI and business background</a>, 
+          accelerating software development for teams and startups.
         </div>
       </div>
 

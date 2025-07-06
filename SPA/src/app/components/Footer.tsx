@@ -11,6 +11,11 @@ export function Footer() {
               The Rails of the JavaScript world. Build production-ready apps with convention over
               configuration.
             </p>
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-gray-400">
+                Created by an engineer combining AI insights, business strategy, and full-stack expertise.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:col-span-2 gap-8">
@@ -43,36 +48,62 @@ export function Footer() {
                     Bun Runtime
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="https://anthropic.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-bun-accent transition-colors"
+                  >
+                    Anthropic
+                  </a>
+                </li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold mb-4">Community</h4>
+              <h4 className="font-semibold mb-4">Connect</h4>
               <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
-                <li>
-                  <a
-                    href="https://github.com/jasencarroll/create-bun-stack/issues"
-                    className="hover:text-bun-accent transition-colors"
-                  >
-                    Report Issues
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#contact"
-                    className="hover:text-bun-accent transition-colors"
-                  >
-                    Contact Us
-                  </a>
-                </li>
                 <li>
                   <a
                     href="https://jasenc.dev"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-bun-accent transition-colors"
+                    className="hover:text-bun-accent transition-colors flex items-center gap-2"
                   >
-                    Created by Jasen
+                    <span>View Portfolio</span>
+                    <span className="text-xs text-gray-500">→</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://www.linkedin.com/in/jasenc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-bun-accent transition-colors flex items-center gap-2"
+                  >
+                    <span>LinkedIn</span>
+                    <span className="text-xs text-gray-500">→</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/jasencarroll"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-bun-accent transition-colors flex items-center gap-2"
+                  >
+                    <span>GitHub Profile</span>
+                    <span className="text-xs text-gray-500">→</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#contact"
+                    className="hover:text-bun-accent transition-colors flex items-center gap-2"
+                  >
+                    <span>Contact</span>
+                    <span className="text-xs text-gray-500">→</span>
                   </a>
                 </li>
               </ul>
@@ -80,9 +111,35 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
-          <p>Built with ❤️ by Jasen Carroll with Claude Code</p>
-          <p className="mt-2">MIT License © {new Date().getFullYear()}</p>
+        <div className="mt-12 pt-8 border-t border-gray-800">
+          <div className="text-center text-gray-400 mb-6">
+            <p>Built with ❤️ by Jasen Carroll with Claude Code</p>
+            <p className="mt-2">MIT License © {new Date().getFullYear()}</p>
+          </div>
+          
+          <div className="flex flex-wrap justify-center gap-4 text-sm">
+            <a
+              href="https://github.com/jasencarroll/create-bun-stack"
+              className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-lg hover:bg-white/10 transition-all"
+            >
+              <span>⭐</span>
+              <span>Star on GitHub</span>
+            </a>
+            <a
+              href="https://jasenc.dev"
+              className="inline-flex items-center gap-2 bg-bun-accent/10 text-bun-accent px-4 py-2 rounded-lg hover:bg-bun-accent/20 transition-all"
+            >
+              <span>🚀</span>
+              <span>Explore More Projects</span>
+            </a>
+            <a
+              href="#contact"
+              className="inline-flex items-center gap-2 bg-white/5 px-4 py-2 rounded-lg hover:bg-white/10 transition-all"
+            >
+              <span>💬</span>
+              <span>Get in Touch</span>
+            </a>
+          </div>
         </div>
       </div>
     </footer>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpenIcon, MagnifyingGlassIcon, RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { DocsContent } from "../components/docs/DocsContent";
+import { SEO } from "../components/SEO";
 
 interface DocData {
   meta: {
@@ -45,12 +46,27 @@ export function DocsPage() {
   }
 
   if (indexDoc) {
-    return <DocsContent html={indexDoc.html || ""} headings={indexDoc.headings || []} />;
+    return (
+      <>
+        <SEO
+          title="Documentation"
+          description="Comprehensive documentation for Bun Stack - learn how to build modern web applications with our Rails-inspired framework"
+          url="https://bun-stack.jasenc.dev/docs"
+        />
+        <DocsContent html={indexDoc.html || ""} headings={indexDoc.headings || []} />
+      </>
+    );
   }
 
   // Fallback welcome page if no README
   return (
-    <div className="py-12">
+    <>
+      <SEO
+        title="Documentation"
+        description="Comprehensive documentation for Bun Stack - learn how to build modern web applications with our Rails-inspired framework"
+        url="https://bun-stack.jasenc.dev/docs"
+      />
+      <div className="py-12">
       <div className="text-center">
         <BookOpenIcon className="mx-auto h-12 w-12 text-bun-light/40" />
         <h2 className="mt-2 text-lg font-semibold text-bun-light">Documentation</h2>
@@ -136,5 +152,6 @@ export function DocsPage() {
         </Link>
       </div>
     </div>
+    </>
   );
 }

@@ -52,6 +52,13 @@ export function ContactForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="glass-effect rounded-xl p-8 space-y-6">
+          <div className="text-center mb-6 p-4 bg-bun-accent/10 rounded-lg">
+            <p className="text-sm text-gray-300">
+              You can trust this contact form works.<br />
+              Please be kind and graceful.
+            </p>
+          </div>
+          
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
               Name

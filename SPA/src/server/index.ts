@@ -13,7 +13,7 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 // Simple in-memory rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 5; // 5 requests per hour per IP
+const RATE_LIMIT_MAX = 2; // 2 requests per hour per IP
 
 // Simple router for our SPA
 async function router(req: Request): Promise<Response> {
@@ -105,10 +105,6 @@ async function router(req: Request): Promise<Response> {
         data.email = sanitize(data.email);
         data.message = sanitize(data.message);
 
-        console.log("📧 New contact form submission:");
-        console.log(`  Name: ${data.name}`);
-        console.log(`  Email: ${data.email}`);
-        console.log(`  Message: ${data.message}`);
 
         // Send email if Resend is configured
         if (resend && process.env.CONTACT_EMAIL_TO) {
@@ -147,13 +143,9 @@ This email was sent from the Bun Stack contact form.
               `,
             });
 
-            console.log("✅ Email sent successfully:", emailData);
           } catch (emailError) {
-            console.error("❌ Failed to send email:", emailError);
             // Don't fail the request if email fails, user experience is more important
           }
-        } else {
-          console.log("⚠️ Resend not configured - skipping email send");
         }
 
         return Response.json({
@@ -189,6 +181,8 @@ This email was sent from the Bun Stack contact form.
         ".gif": "image/gif",
         ".svg": "image/svg+xml",
         ".ico": "image/x-icon",
+        ".xml": "application/xml",
+        ".txt": "text/plain",
       };
 
       const ext = pathname.substring(pathname.lastIndexOf("."));
