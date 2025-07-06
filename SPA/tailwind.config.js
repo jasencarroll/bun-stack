@@ -6,7 +6,7 @@ module.exports = {
       colors: {
         "bun-dark": "#14141a",
         "bun-light": "#fbf0df",
-        "bun-accent": "#f472b6",
+        "bun-accent": "#c084fc",
       },
       fontFamily: {
         mono: ["Menlo", "Monaco", "Courier New", "monospace"],

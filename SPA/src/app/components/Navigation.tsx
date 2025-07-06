@@ -29,7 +29,7 @@ export function Navigation() {
                 Contact
               </a>
               <a
-                href="https://github.com/jasencarroll/bun-stack"
+                href="https://github.com/jasencarroll/create-bun-stack"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-bun-accent transition-colors"
@@ -38,7 +38,7 @@ export function Navigation() {
               </a>
               <a
                 href="#get-started"
-                className="bg-bun-accent text-bun-dark px-4 py-2 rounded-lg font-semibold hover:bg-pink-500 transition-colors"
+                className="bg-bun-accent text-bun-dark px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
               >
                 Get Started
               </a>
@@ -49,6 +49,8 @@ export function Navigation() {
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-bun-light hover:text-bun-accent"
+              aria-label={isOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isOpen}
             >
               {isOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
             </button>
@@ -76,7 +78,7 @@ export function Navigation() {
               Contact
             </a>
             <a
-              href="https://github.com/jasencarroll/bun-stack"
+              href="https://github.com/jasencarroll/create-bun-stack"
               className="block px-3 py-2 hover:text-bun-accent transition-colors"
             >
               GitHub

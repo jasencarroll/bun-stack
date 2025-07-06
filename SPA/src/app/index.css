@@ -32,7 +32,7 @@
 
 @layer components {
   .gradient-text {
-    @apply bg-gradient-to-r from-bun-accent via-purple-400 to-bun-accent bg-clip-text text-transparent animate-gradient;
+    @apply bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent animate-gradient;
     background-size: 200% auto;
   }
 

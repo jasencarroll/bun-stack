@@ -11,12 +11,25 @@ export function Hero() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <section className="min-h-screen flex items-center justify-center relative pt-16">
-      <div className="text-center px-4 max-w-5xl mx-auto">
-        <div className="mb-8 animate-float">
-          <pre className="text-bun-accent text-sm md:text-base font-mono inline-block">
-            {`╔═══════════════════════════════════════════════════════════════╗
+  const mobileAsciiArt = `╔════════════════════════════════════════════╗
+║                                            ║
+║  ██████╗ ██╗   ██╗███╗  ██╗                ║
+║  ██╔══██╗██║   ██║████╗ ██║                ║
+║  ██████╔╝██║   ██║██╔██╗██║                ║
+║  ██╔══██╗██║   ██║██║╚████║                ║
+║  ██████╔╝╚██████╔╝██║ ╚███║                ║
+║  ╚═════╝  ╚═════╝ ╚═╝  ╚══╝                ║
+║                                            ║
+║  ███████╗████████╗ █████╗  ██████╗██╗  ██╗ ║
+║  ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝ ║
+║  ███████╗   ██║   ███████║██║     █████╔╝  ║
+║  ╚════██║   ██║   ██╔══██║██║     ██╔═██╗  ║
+║  ███████║   ██║   ██║  ██║╚██████╗██║  ██╗ ║
+║  ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ║
+║                                            ║
+╚════════════════════════════════════════════╝`;
+
+  const desktopAsciiArt = `╔═══════════════════════════════════════════════════════════════╗
 ║        ██████╗ ██╗   ██╗███╗   ██╗                            ║
 ║        ██╔══██╗██║   ██║████╗  ██║                            ║
 ║        ██████╔╝██║   ██║██╔██╗ ██║                            ║
@@ -30,15 +43,25 @@ export function Hero() {
 ║        ╚════██║   ██║   ██╔══██║██║     ██╔═██╗               ║
 ║        ███████║   ██║   ██║  ██║╚██████╗██║  ██╗              ║
 ║        ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝              ║
-╚═══════════════════════════════════════════════════════════════╝`}
+╚═══════════════════════════════════════════════════════════════╝`;
+
+  return (
+    <section className="min-h-screen flex items-center justify-center relative pt-16">
+      <div className="text-center px-4 max-w-5xl mx-auto">
+        <div className="mb-8 animate-float">
+          <pre className="text-bun-accent text-xs sm:text-sm md:text-base font-mono inline-block md:hidden">
+            {mobileAsciiArt}
+          </pre>
+          <pre className="text-bun-accent text-sm md:text-base font-mono hidden md:inline-block">
+            {desktopAsciiArt}
           </pre>
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-bold mb-6">
+        <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-6">
           The <span className="gradient-text">Rails</span> of the JavaScript world
         </h1>
 
-        <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+        <p className="text-lg sm:text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
           Build production-ready fullstack apps in seconds, not hours. Convention over configuration
           meets modern JavaScript.
         </p>
@@ -73,22 +96,22 @@ export function Hero() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href="#get-started"
-            className="bg-bun-accent text-bun-dark px-8 py-3 rounded-lg font-semibold text-lg hover:bg-pink-500 transition-colors"
+            className="bg-bun-accent text-bun-dark px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-600 transition-colors"
           >
             Get Started
           </a>
           <a
-            href="https://github.com/jasencarroll/bun-stack"
+            href="https://github.com/jasencarroll/create-bun-stack"
             target="_blank"
             rel="noopener noreferrer"
-            className="glass-effect px-8 py-3 rounded-lg font-semibold text-lg hover:bg-white/10 transition-colors"
+            className="glass-effect px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-white/10 transition-colors"
           >
             View on GitHub
           </a>
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce hidden md:block">
         <ArrowDownIcon className="h-6 w-6 text-gray-400" />
       </div>
     </section>

@@ -26,5 +26,16 @@
     "tailwindcss": "^3.3.0",
     "prettier": "^3.3.3",
     "typescript": "^5.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasencarroll/create-bun-stack.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jasencarroll/create-bun-stack/issues"
+  },
+  "homepage": "https://bun-stack.jasenc.dev",
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }
