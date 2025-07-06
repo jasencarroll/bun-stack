@@ -162,9 +162,10 @@ const DOC_ORDER: Record<string, Record<string, number>> = {
   "guide": {
     "project-structure": 1,
     "configuration": 2,
-    "development": 3,
-    "testing": 4,
-    "deployment": 5,
+    "admin-user": 3,
+    "development": 4,
+    "testing": 5,
+    "deployment": 6,
   },
   "features": {
     "routing": 1,

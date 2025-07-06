@@ -14,6 +14,9 @@ Understand how Create Bun Stack applications are organized. Learn about the file
 ### [Configuration](/docs/guide/configuration)
 Master environment variables, database configuration, and application settings. Learn how to configure your app for different environments.
 
+### [Admin User Management](/docs/guide/admin-user)
+Learn how to promote users to admin status and manage administrative privileges. Covers both automated scripts and manual database operations.
+
 ### [Development Workflow](/docs/guide/development)
 Discover the tools and techniques for efficient development. From hot reload to debugging, learn how to maximize your productivity.
 
