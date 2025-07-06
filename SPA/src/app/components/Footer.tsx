@@ -32,7 +32,7 @@ export function Footer() {
                 </li>
                 <li>
                   <a
-                    href="https://github.com/jasencarroll/create-bun-stack#readme"
+                    href="https://www.bun-stack.jasenc.dev/docs"
                     className="hover:text-bun-accent transition-colors"
                   >
                     Documentation
