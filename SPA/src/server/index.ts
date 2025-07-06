@@ -1,6 +1,7 @@
 import { serve } from "bun";
 import { join } from "path";
 import { Resend } from "resend";
+import { docs } from "./routes/docs";
 
 const publicDir = join(import.meta.dir, "../../public");
 const distDir = join(import.meta.dir, "../../dist");
@@ -28,6 +29,32 @@ async function router(req: Request): Promise<Response> {
       } catch (e) {
         return Response.json({ time: Date.now() });
       }
+    }
+
+    // Documentation routes
+    if (pathname.startsWith("/api/docs")) {
+      const docsPath = pathname.replace("/api/docs", "");
+      
+      // Match the path to the appropriate handler
+      if (docsPath === "" || docsPath === "/") {
+        const handler = docs["/"][req.method as keyof typeof docs["/"]];
+        if (handler) {
+          return handler(req);
+        }
+      } else if (docsPath === "/search") {
+        const handler = docs["/search"][req.method as keyof typeof docs["/search"]];
+        if (handler) {
+          return handler(req);
+        }
+      } else {
+        // Handle wildcard routes
+        const handler = docs["/*"][req.method as keyof typeof docs["/*"]];
+        if (handler) {
+          return handler(req);
+        }
+      }
+      
+      return new Response("Method Not Allowed", { status: 405 });
     }
 
     if (pathname === "/api/contact" && req.method === "POST") {

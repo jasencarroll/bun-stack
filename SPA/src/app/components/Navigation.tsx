@@ -1,33 +1,49 @@
 import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export function Navigation() {
   const [isOpen, setIsOpen] = React.useState(false);
+  const navigate = useNavigate();
+
+  const handleSectionLink = (sectionId: string) => {
+    navigate('/');
+    // Small delay to ensure navigation completes before scrolling
+    setTimeout(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
 
   return (
     <nav className="fixed top-0 w-full z-50 glass-effect">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <a href="/" className="text-xl font-bold gradient-text">
+            <Link to="/" className="text-xl font-bold gradient-text">
               BUN STACK
-            </a>
+            </Link>
           </div>
 
           <div className="hidden md:block">
             <div className="flex items-center space-x-8">
-              <a href="#features" className="hover:text-bun-accent transition-colors">
+              <Link to="/docs" className="hover:text-bun-accent transition-colors font-semibold">
+                Docs
+              </Link>
+              <button onClick={() => handleSectionLink('features')} className="hover:text-bun-accent transition-colors">
                 Features
-              </a>
-              <a href="#comparison" className="hover:text-bun-accent transition-colors">
+              </button>
+              <button onClick={() => handleSectionLink('comparison')} className="hover:text-bun-accent transition-colors">
                 Compare
-              </a>
-              <a href="#examples" className="hover:text-bun-accent transition-colors">
+              </button>
+              <button onClick={() => handleSectionLink('examples')} className="hover:text-bun-accent transition-colors">
                 Examples
-              </a>
-              <a href="#contact" className="hover:text-bun-accent transition-colors">
+              </button>
+              <button onClick={() => handleSectionLink('contact')} className="hover:text-bun-accent transition-colors">
                 Contact
-              </a>
+              </button>
               <a
                 href="https://github.com/jasencarroll/create-bun-stack"
                 target="_blank"
@@ -36,12 +52,12 @@ export function Navigation() {
               >
                 GitHub
               </a>
-              <a
-                href="#get-started"
+              <button
+                onClick={() => handleSectionLink('get-started')}
                 className="bg-bun-accent text-bun-dark px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
               >
                 Get Started
-              </a>
+              </button>
             </div>
           </div>
 
@@ -62,33 +78,37 @@ export function Navigation() {
       {isOpen && (
         <div className="md:hidden glass-effect">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            <a href="#features" className="block px-3 py-2 hover:text-bun-accent transition-colors">
+            <Link to="/docs" className="block px-3 py-2 hover:text-bun-accent transition-colors font-semibold" onClick={() => setIsOpen(false)}>
+              Docs
+            </Link>
+            <button onClick={() => { handleSectionLink('features'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
               Features
-            </a>
-            <a
-              href="#comparison"
-              className="block px-3 py-2 hover:text-bun-accent transition-colors"
+            </button>
+            <button
+              onClick={() => { handleSectionLink('comparison'); setIsOpen(false); }}
+              className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
             >
               Compare
-            </a>
-            <a href="#examples" className="block px-3 py-2 hover:text-bun-accent transition-colors">
+            </button>
+            <button onClick={() => { handleSectionLink('examples'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
               Examples
-            </a>
-            <a href="#contact" className="block px-3 py-2 hover:text-bun-accent transition-colors">
+            </button>
+            <button onClick={() => { handleSectionLink('contact'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
               Contact
-            </a>
+            </button>
             <a
               href="https://github.com/jasencarroll/create-bun-stack"
               className="block px-3 py-2 hover:text-bun-accent transition-colors"
+              onClick={() => setIsOpen(false)}
             >
               GitHub
             </a>
-            <a
-              href="#get-started"
-              className="block px-3 py-2 bg-bun-accent text-bun-dark rounded-lg font-semibold text-center"
+            <button
+              onClick={() => { handleSectionLink('get-started'); setIsOpen(false); }}
+              className="block w-full text-left px-3 py-2 bg-bun-accent text-bun-dark rounded-lg font-semibold text-center"
             >
               Get Started
-            </a>
+            </button>
           </div>
         </div>
       )}
