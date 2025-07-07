@@ -54,7 +54,6 @@ If you're stuck or need clarification on any concept:
 
 - Check the [troubleshooting section](/docs/guide/development#troubleshooting)
 - Browse the [API reference](/docs/api)
-- Ask questions in our [Discord](https://discord.gg/bun-stack)
-- Search [GitHub issues](https://github.com/your-repo/create-bun-stack/issues)
+- Search [GitHub issues](https://github.com/jasencarroll/create-bun-stack/issues)
 
 Ready to dive deeper? Start with understanding the [Project Structure](/docs/guide/project-structure).

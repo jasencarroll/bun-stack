@@ -272,4 +272,4 @@ source .env.backup
 - Check platform-specific documentation
 - Review [Troubleshooting Guide](../guide/troubleshooting.md)
 - Join our [Community Discord](https://discord.gg/bun-stack)
-- Search [GitHub Issues](https://github.com/your-repo/create-bun-stack/issues)
+- Search [GitHub Issues](https://github.com/jasencarroll/create-bun-stack/issues)

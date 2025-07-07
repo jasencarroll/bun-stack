@@ -200,7 +200,7 @@ metrics.gauge("memory.usage", process.memoryUsage().heapUsed);
 ## Getting Help
 
 - Review the specific guide for your use case
-- Check our [GitHub Discussions](https://github.com/your-repo/discussions)
+- Check our [GitHub Discussions](https://github.com/jasencarroll/discussions)
 - Join our [Discord Community](https://discord.gg/bun-stack)
 - Search [Stack Overflow](https://stackoverflow.com/questions/tagged/bun-stack)
 

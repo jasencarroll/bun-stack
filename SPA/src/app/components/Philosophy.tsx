@@ -64,7 +64,7 @@ export function Philosophy() {
           
           <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8 max-w-2xl mx-auto space-y-4">
             <p className="text-gray-300">
-              Engineer. Systems thinker. MBA. ADHD-fueled DX evangelist.
+              Engineer. Systems thinker. MBA. DX evangelist.
             </p>
             
             <blockquote className="border-l-4 border-bun-accent pl-4">

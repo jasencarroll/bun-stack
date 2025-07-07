@@ -130,8 +130,8 @@ Create Bun Stack follows these principles:
 
 ## Community
 
-- 🐛 [Report Issues](https://github.com/your-repo/create-bun-stack/issues)
-- 💡 [Discussions](https://github.com/your-repo/create-bun-stack/discussions)
+- 🐛 [Report Issues](https://github.com/jasencarroll/create-bun-stack/issues)
+- 💡 [Discussions](https://github.com/jasencarroll/create-bun-stack/discussions)
 - 💬 [Discord Community](https://discord.gg/bun-stack)
 - 🐦 [Twitter Updates](https://twitter.com/bunstack)
 
@@ -165,16 +165,6 @@ We welcome contributions! See our [Contributing Guide](/docs/CONTRIBUTING) for d
 |---------|-------------|----------------|
 | 1.x | 1.0+ | ✅ Active |
 | 0.x | 0.8+ | ⚠️ Legacy |
-
-## License
-
-Create Bun Stack is open source software licensed under the [MIT License](/docs/LICENSE).
-
-## Sponsors
-
-Support the development of Create Bun Stack:
-- [GitHub Sponsors](https://github.com/sponsors/your-username)
-- [Open Collective](https://opencollective.com/create-bun-stack)
 
 ---
 

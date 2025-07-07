@@ -33,6 +33,6 @@ Understand the prerequisites and system compatibility for Create Bun Stack appli
 
 - Check our [troubleshooting guide](/docs/guide/development#troubleshooting)
 - Join our [Discord community](https://discord.gg/bun-stack)
-- Report issues on [GitHub](https://github.com/your-repo/create-bun-stack/issues)
+- Report issues on [GitHub](https://github.com/jasencarroll/create-bun-stack/issues)
 
 Ready to start building? Begin with the [Installation guide](/docs/getting-started/installation)!

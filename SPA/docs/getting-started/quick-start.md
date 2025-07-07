@@ -172,5 +172,5 @@ Congratulations! You now have a working full-stack application. Here's what to e
 ## Getting Help
 
 - Check the [documentation](/docs)
-- Report issues on [GitHub](https://github.com/your-repo/create-bun-stack)
+- Report issues on [GitHub](https://github.com/jasencarroll/create-bun-stack)
 - Join our community [Discord](https://discord.gg/your-invite)

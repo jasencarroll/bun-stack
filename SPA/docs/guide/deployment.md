@@ -312,7 +312,7 @@ region: nyc
 services:
   - name: web
     github:
-      repo: your-username/your-repo
+      repo: your-username/jasencarroll
       branch: main
     build_command: bun install && bun run build:css
     run_command: bun src/server/index.ts

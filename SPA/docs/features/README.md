@@ -269,7 +269,7 @@ Planned features for future releases:
 - Check individual feature guides for detailed documentation
 - See [Troubleshooting](../guide/troubleshooting.md) for common issues
 - Join our [Discord community](https://discord.gg/bun-stack)
-- Report bugs on [GitHub](https://github.com/your-repo/create-bun-stack)
+- Report bugs on [GitHub](https://github.com/jasencarroll/create-bun-stack)
 
 ## Next Steps
 
