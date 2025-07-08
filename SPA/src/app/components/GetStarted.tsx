@@ -86,8 +86,21 @@ export function GetStarted() {
           </a>
           
           <div className="pt-8 border-t border-gray-800">
+            <h3 className="text-2xl font-bold mb-6">
+              Ready to <span className="gradient-text">deploy</span>?
+            </h3>
+            <div className="flex justify-center mb-8">
+              <a
+                href="https://railway.com/deploy/create-bun-stack?referralCode=2oHJjn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block hover:opacity-90 transition-opacity transform hover:scale-105"
+              >
+                <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+              </a>
+            </div>
             <p className="text-gray-400 mb-4">
-              Built to accelerate your development workflow
+              Or explore other options to accelerate your workflow
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <a

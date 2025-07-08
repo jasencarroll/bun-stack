@@ -99,20 +99,31 @@ export function Hero() {
         </div>
 
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+        <div className="flex flex-col items-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="#get-started"
+              className="bg-bun-accent text-bun-dark px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-600 transition-colors"
+            >
+              Get Started
+            </a>
+            <a
+              href="https://github.com/jasencarroll/create-bun-stack"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-effect px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-white/10 transition-colors"
+            >
+              View on GitHub
+            </a>
+          </div>
           <a
-            href="#get-started"
-            className="bg-bun-accent text-bun-dark px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-purple-600 transition-colors"
-          >
-            Get Started
-          </a>
-          <a
-            href="https://github.com/jasencarroll/create-bun-stack"
+            href="https://railway.com/deploy/create-bun-stack?referralCode=2oHJjn"
             target="_blank"
             rel="noopener noreferrer"
-            className="glass-effect px-6 sm:px-8 py-3 rounded-lg font-semibold text-base sm:text-lg hover:bg-white/10 transition-colors"
+            className="inline-block hover:opacity-90 transition-opacity"
+            style={{ height: '48px' }}
           >
-            View on GitHub
+            <img src="https://railway.com/button.svg" alt="Deploy on Railway" style={{ height: '100%', width: 'auto' }} />
           </a>
         </div>
         
