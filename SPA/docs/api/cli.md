@@ -48,7 +48,7 @@ The CLI will guide you through the following options:
 
 ```bash
 # Skip interactive prompts (planned feature)
-bunx create-bun-stack my-app --template default --db postgres --auth --git
+bunx create-bun-stack --template default --db postgres --auth --git
 
 # Options:
 #   --template <name>    Template to use (default, minimal, api)

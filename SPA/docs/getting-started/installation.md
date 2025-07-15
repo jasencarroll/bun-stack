@@ -35,7 +35,7 @@ bun --version
 You don't need to install Create Bun Stack globally. You can use it directly with `bunx`:
 
 ```bash
-bunx create-bun-stack my-app
+bunx create-bun-stack
 ```
 
 This will:
