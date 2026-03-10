@@ -12,7 +12,7 @@ Security features include:
 - 📝 **Input Validation** - Zod schemas for all inputs
 - 🔒 **Security Headers** - XSS, clickjacking protection
 - 💉 **SQL Injection Prevention** - Parameterized queries
-- 🔑 **Password Security** - Argon2id hashing
+- 🔑 **Password Security** - Bun.password hashing
 - 🌐 **CORS Configuration** - Cross-origin control
 
 ## Security Headers
@@ -22,45 +22,64 @@ Security features include:
 Security headers are automatically applied to all responses:
 
 ```typescript
-// src/server/middleware/security.ts
-export function securityMiddleware(req: Request): Response | null {
-  const headers = new Headers();
-  const isDev = process.env.NODE_ENV === "development";
+// src/server/middleware/security-headers.ts
+export function applySecurityHeaders(response: Response, req: Request): Response {
+  const headers = new Headers(response.headers);
+  const url = new URL(req.url);
+  const contentType = response.headers.get("Content-Type") || "";
 
-  // Determine if response is HTML
-  const isHtml = req.headers.get("accept")?.includes("text/html");
-
-  if (isHtml) {
-    // Strict CSP for HTML responses
-    headers.set(
-      "Content-Security-Policy",
-      isDev
-        ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' ws: wss:; img-src 'self' data: https:; font-src 'self' data:;"
-        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';"
-    );
-  }
-
-  // Security headers for all responses
+  // General security headers - apply to all responses
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("X-XSS-Protection", "1; mode=block");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()"
-  );
+  headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
 
-  // HSTS for production
-  if (!isDev) {
-    headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
-    );
+  // Remove server identification
+  headers.delete("X-Powered-By");
+
+  // Content Security Policy - only for HTML responses
+  if (contentType.includes("text/html")) {
+    const isDev = process.env.NODE_ENV !== "production";
+    const cspDirectives = [
+      "default-src 'self'",
+      `script-src 'self' ${isDev ? "'unsafe-inline' 'unsafe-eval'" : ""}`,
+      `style-src 'self' ${isDev ? "'unsafe-inline'" : ""}`,
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ];
+    headers.set("Content-Security-Policy", cspDirectives.join("; "));
   }
 
-  // Attach headers to request for later use
-  (req as any).securityHeaders = headers;
-  return null;
+  // HSTS - only in production
+  if (process.env.NODE_ENV === "production") {
+    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  // Cache control
+  if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/users") || url.pathname.startsWith("/api/admin")) {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    } else {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    }
+    headers.set("Pragma", "no-cache");
+    headers.set("Expires", "0");
+  } else if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  } else if (url.pathname === "/manifest.json") {
+    headers.set("Cache-Control", "public, max-age=3600");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 ```
 
@@ -84,55 +103,58 @@ CSRF protection uses the double-submit cookie pattern:
 
 ```typescript
 // src/server/middleware/csrf.ts
-import { createHash } from "crypto";
+import { randomBytes } from "node:crypto";
 
-export async function csrfMiddleware(req: Request): Promise<Response | null> {
-  // Skip for safe methods
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    return null;
+// WARNING: In-memory CSRF store. Tokens are lost on server restart and not shared
+// across instances. For production multi-instance deployments, replace with Redis
+// or database-backed storage.
+const csrfTokenStore = new Map<string, { token: string; expires: number }>();
+
+export function generateCsrfToken(): { token: string; cookie: string } {
+  const token = randomBytes(32).toString("hex");
+  const cookie = randomBytes(32).toString("hex");
+
+  csrfTokenStore.set(cookie, {
+    token,
+    expires: Date.now() + 24 * 60 * 60 * 1000,
+  });
+
+  cleanupExpiredTokens();
+  return { token, cookie };
+}
+
+export function validateCsrfToken(cookie: string | null, token: string | null): boolean {
+  if (!cookie || !token) return false;
+  const stored = csrfTokenStore.get(cookie);
+  if (!stored) return false;
+  if (stored.expires < Date.now()) {
+    csrfTokenStore.delete(cookie);
+    return false;
   }
+  return stored.token === token;
+}
 
-  // Skip for API routes that use different auth
-  if (req.url.includes("/api/webhook")) {
-    return null;
-  }
+export function applyCsrfProtection(req: Request): Response | null {
+  if (!requiresCsrfProtection(req)) return null;
 
-  const cookieToken = getCookie(req, "csrf-token");
-  const headerToken = req.headers.get("x-csrf-token");
+  const cookies = parseCookies(req.headers.get("Cookie") || "");
+  const csrfCookie = cookies["csrf-token"] || null;
+  const csrfToken = req.headers.get("X-CSRF-Token");
 
-  if (!cookieToken || !headerToken) {
-    return Response.json(
-      { error: "CSRF token missing" },
-      { status: 403 }
-    );
-  }
-
-  // Verify tokens match
-  const isValid = await Bun.password.verify(headerToken, cookieToken);
-  
-  if (!isValid) {
-    return Response.json(
-      { error: "CSRF token invalid" },
-      { status: 403 }
-    );
+  if (!validateCsrfToken(csrfCookie, csrfToken)) {
+    return Response.json({ error: "CSRF token validation failed" }, { status: 403 });
   }
 
   return null;
-}
-
-// Generate CSRF token for login/register
-export function generateCsrfToken(): { token: string; cookie: string } {
-  const token = crypto.randomUUID();
-  const cookie = Bun.password.hashSync(token);
-  
-  return { token, cookie };
 }
 ```
 
 ### Frontend Integration
 
+> **Note:** The API client below is a recommended pattern. This file is not included in the generated template — create it as needed.
+
 ```typescript
-// src/app/lib/api/client.ts
+// src/app/lib/api/client.ts (not in template — create as needed)
 export class ApiClient {
   private csrfToken: string | null = null;
 
@@ -169,91 +191,71 @@ export class ApiClient {
 
 ```typescript
 // src/server/middleware/rate-limit.ts
-interface RateLimitConfig {
-  windowMs: number;  // Time window in milliseconds
-  max: number;       // Max requests per window
-  message?: string;  // Error message
-  skipIf?: (req: Request) => boolean;
+interface RateLimitOptions {
+  windowMs?: number;  // Window size in milliseconds (default: 15 minutes)
+  max?: number;       // Max requests per window (default: 5)
+  message?: string;   // Error message
 }
 
-const limits = new Map<string, { count: number; resetAt: number }>();
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-export function createRateLimit(config: RateLimitConfig) {
-  return async function rateLimitMiddleware(req: Request): Promise<Response | null> {
-    // Skip in test environment
-    if (process.env.NODE_ENV === "test") {
+export function createRateLimiter(options: RateLimitOptions = {}) {
+  const {
+    windowMs = 15 * 60 * 1000,
+    max = 5,
+    message = "Too many requests, please try again later",
+  } = options;
+
+  return (req: Request): Response | null => {
+    if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
       return null;
     }
 
-    // Skip if condition met
-    if (config.skipIf?.(req)) {
-      return null;
-    }
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
 
-    const ip = getClientIp(req);
-    const key = `${ip}:${new URL(req.url).pathname}`;
     const now = Date.now();
+    const resetTime = now + windowMs;
 
-    const limit = limits.get(key);
-    
-    if (!limit || limit.resetAt < now) {
-      // Create new window
-      limits.set(key, {
-        count: 1,
-        resetAt: now + config.windowMs,
-      });
+    let entry = rateLimitStore.get(ip);
+
+    if (!entry || entry.resetTime < now) {
+      entry = { count: 1, resetTime };
+      rateLimitStore.set(ip, entry);
       return null;
     }
 
-    if (limit.count >= config.max) {
-      return Response.json(
-        { error: config.message || "Too many requests" },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil((limit.resetAt - now) / 1000)),
-            "X-RateLimit-Limit": String(config.max),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": new Date(limit.resetAt).toISOString(),
-          },
-        }
-      );
+    entry.count++;
+
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      return new Response(JSON.stringify({ error: message }), {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(max),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(entry.resetTime),
+        },
+      });
     }
 
-    limit.count++;
     return null;
   };
 }
-```
 
-### Applying Rate Limits
-
-```typescript
-// src/server/routes/auth.ts
-const authRateLimit = createRateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts
-  message: "Too many login attempts, please try again later",
+// Pre-configured rate limiters
+export const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many authentication attempts, please try again later",
 });
 
-export const auth = {
-  "/login": {
-    POST: [authRateLimit, handleLogin],
-  },
-  "/register": {
-    POST: [authRateLimit, handleRegister],
-  },
-};
-
-// API rate limit
-const apiRateLimit = createRateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  skipIf: (req) => {
-    // Skip for authenticated admin users
-    const user = getUserFromRequest(req);
-    return user?.role === "admin";
-  },
+export const strictAuthRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: "Too many failed login attempts, please try again later",
 });
 ```
 
@@ -261,10 +263,10 @@ const apiRateLimit = createRateLimit({
 
 ### Zod Schemas
 
-Define strict validation schemas:
+> **Note:** The schema file below (`src/server/schemas/user.schema.ts`) is a recommended pattern. It is not included in the generated template — the template defines schemas inline in route handlers (e.g., `src/server/routes/auth.ts`). The actual template `loginSchema` uses `z.string().email()` and `z.string().min(8)` without complex password rules.
 
 ```typescript
-// src/server/schemas/user.schema.ts
+// src/server/schemas/user.schema.ts (not in template — create as needed)
 import { z } from "zod";
 
 export const emailSchema = z
@@ -303,60 +305,35 @@ export const searchSchema = z.object({
 });
 ```
 
-### Validation Middleware
+### Validation Utility
 
 ```typescript
 // src/server/middleware/validation.ts
-export function validateBody<T>(schema: z.ZodSchema<T>) {
-  return async function validationMiddleware(
-    req: Request
-  ): Promise<Response | null> {
-    try {
-      const body = await req.json();
-      const result = schema.safeParse(body);
+import { z } from "zod";
 
-      if (!result.success) {
-        return Response.json(
-          {
-            error: "Validation failed",
-            details: result.error.flatten(),
-          },
-          { status: 400 }
-        );
-      }
-
-      // Attach validated data
-      (req as any).validatedBody = result.data;
-      return null;
-    } catch (error) {
-      return Response.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
+export async function validateRequest<T>(
+  req: Request,
+  schema: z.ZodSchema<T>
+): Promise<T | Response> {
+  try {
+    const body = await req.json();
+    return schema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json({ errors: error.errors }, { status: 400 });
     }
-  };
+    return new Response("Invalid request", { status: 400 });
+  }
 }
 
-export function validateQuery<T>(schema: z.ZodSchema<T>) {
-  return function validationMiddleware(req: Request): Response | null {
-    const url = new URL(req.url);
-    const params = Object.fromEntries(url.searchParams);
-    
-    const result = schema.safeParse(params);
-    
-    if (!result.success) {
-      return Response.json(
-        {
-          error: "Invalid query parameters",
-          details: result.error.flatten(),
-        },
-        { status: 400 }
-      );
-    }
+// Usage in route handler
+async function handleCreateUser(req: Request) {
+  const body = await validateRequest(req, createUserSchema);
+  if (body instanceof Response) return body;
 
-    (req as any).validatedQuery = result.data;
-    return null;
-  };
+  // body is now typed as the schema output
+  const user = await userRepository.create(body);
+  return Response.json(user, { status: 201 });
 }
 ```
 
@@ -368,36 +345,26 @@ Always use parameterized queries:
 
 ```typescript
 // ❌ NEVER do this - SQL injection vulnerability
-const users = await db.execute(
-  sql`SELECT * FROM users WHERE email = ${userInput}`
-);
+const users = db.query(`SELECT * FROM users WHERE email = '${userInput}'`);
 
-// ✅ Safe - parameterized query
+// ✅ Safe - Drizzle ORM query builder
 const users = await db
   .select()
   .from(usersTable)
   .where(eq(usersTable.email, userInput));
 
-// ✅ Safe - prepared statement
-const getUserByEmail = db
-  .select()
-  .from(usersTable)
-  .where(eq(usersTable.email, sql.placeholder("email")))
-  .prepare();
-
-const user = await getUserByEmail.execute({ email: userInput });
-
-// ✅ Safe - raw query with parameters (if needed)
+// ✅ Safe - Drizzle tagged template (automatically parameterized)
 const results = await db.execute(
-  sql`SELECT * FROM users WHERE email = ${sql.placeholder("email")}`,
-  { email: userInput }
+  sql`SELECT * FROM users WHERE email = ${userInput}`
 );
 ```
 
 ### Query Builder Safety
 
+> **Note:** The `BaseRepository` class below is a recommended pattern. It is not included in the generated template — create it as needed.
+
 ```typescript
-// src/db/repositories/base.repository.ts
+// src/db/repositories/base.repository.ts (not in template — create as needed)
 export abstract class BaseRepository<T> {
   protected abstract table: Table;
 
@@ -444,64 +411,31 @@ export abstract class BaseRepository<T> {
 ```typescript
 // src/lib/crypto.ts
 export async function hashPassword(password: string): Promise<string> {
-  // Validate password
   if (!password || password.length === 0) {
     throw new Error("Password cannot be empty");
   }
-
-  // Use Argon2id (Bun's default)
-  return await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 19456,  // 19 MB
-    timeCost: 2,        // 2 iterations
-  });
+  return await Bun.password.hash(password);
 }
 
 export async function verifyPassword(
   password: string,
-  hash: string
+  hashedPassword: string
 ): Promise<boolean> {
-  return await Bun.password.verify(password, hash);
-}
-
-// Password strength checker
-export function checkPasswordStrength(password: string): {
-  score: number;
-  feedback: string[];
-} {
-  let score = 0;
-  const feedback: string[] = [];
-
-  if (password.length >= 12) score += 2;
-  else if (password.length >= 8) score += 1;
-  else feedback.push("Use at least 8 characters");
-
-  if (/[a-z]/.test(password)) score += 1;
-  else feedback.push("Include lowercase letters");
-
-  if (/[A-Z]/.test(password)) score += 1;
-  else feedback.push("Include uppercase letters");
-
-  if (/[0-9]/.test(password)) score += 1;
-  else feedback.push("Include numbers");
-
-  if (/[^A-Za-z0-9]/.test(password)) score += 2;
-  else feedback.push("Include special characters");
-
-  // Check common passwords
-  if (commonPasswords.includes(password.toLowerCase())) {
-    score = 0;
-    feedback.unshift("This password is too common");
+  if (!hashedPassword) return false;
+  try {
+    return await Bun.password.verify(password, hashedPassword);
+  } catch {
+    return false;
   }
-
-  return { score: Math.min(score, 5), feedback };
 }
 ```
 
 ### Account Security
 
+> **Note:** The `AuthService` class below is a recommended pattern for production account lockout. It is not included in the generated template — create it as needed.
+
 ```typescript
-// src/server/services/auth.service.ts
+// src/server/services/auth.service.ts (not in template — create as needed)
 export class AuthService {
   private failedAttempts = new Map<string, number>();
   private lockedAccounts = new Map<string, number>();
@@ -552,84 +486,66 @@ export class AuthService {
 
 ```typescript
 // src/server/middleware/cors.ts
-interface CorsOptions {
-  origin?: string | string[] | ((origin: string) => boolean);
-  methods?: string[];
-  allowedHeaders?: string[];
-  exposedHeaders?: string[];
-  credentials?: boolean;
-  maxAge?: number;
+import { env } from "../../config/env";
+
+const PORT = env.PORT;
+const ALLOWED_ORIGINS =
+  env.NODE_ENV === "production"
+    ? ["https://yourdomain.com"]
+    : [
+        `http://localhost:${PORT}`,
+        `http://localhost:${Number(PORT) + 1}`,
+        `http://127.0.0.1:${PORT}`,
+      ];
+
+const ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+const ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token"];
+
+export function applyCorsHeaders(response: Response, origin: string | null): Response {
+  const headers = new Headers(response.headers);
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
+
+  headers.set("Vary", "Origin");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
-export function createCorsMiddleware(options: CorsOptions = {}) {
-  const {
-    origin = "*",
-    methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders = ["Content-Type", "Authorization", "X-CSRF-Token"],
-    exposedHeaders = ["X-Total-Count", "X-Page"],
-    credentials = true,
-    maxAge = 86400,
-  } = options;
+export function handleCorsPreflightRequest(req: Request): Response | null {
+  if (req.method !== "OPTIONS") return null;
 
-  return function corsMiddleware(req: Request): Response | null {
-    const requestOrigin = req.headers.get("origin");
-    
-    // Handle preflight
-    if (req.method === "OPTIONS") {
-      const headers = new Headers();
-      
-      // Set origin
-      if (origin === "*") {
-        headers.set("Access-Control-Allow-Origin", "*");
-      } else if (typeof origin === "function") {
-        if (requestOrigin && origin(requestOrigin)) {
-          headers.set("Access-Control-Allow-Origin", requestOrigin);
-        }
-      } else if (Array.isArray(origin)) {
-        if (requestOrigin && origin.includes(requestOrigin)) {
-          headers.set("Access-Control-Allow-Origin", requestOrigin);
-        }
-      } else {
-        headers.set("Access-Control-Allow-Origin", origin);
-      }
+  const origin = req.headers.get("Origin");
+  const headers = new Headers();
 
-      headers.set("Access-Control-Allow-Methods", methods.join(", "));
-      headers.set("Access-Control-Allow-Headers", allowedHeaders.join(", "));
-      headers.set("Access-Control-Max-Age", String(maxAge));
-      
-      if (credentials) {
-        headers.set("Access-Control-Allow-Credentials", "true");
-      }
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
 
-      return new Response(null, { status: 204, headers });
-    }
+  headers.set("Access-Control-Allow-Methods", ALLOWED_METHODS.join(", "));
+  headers.set("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
+  headers.set("Access-Control-Max-Age", "86400");
+  headers.set("Vary", "Origin");
 
-    // Set CORS headers for actual requests
-    (req as any).corsHeaders = getCorsHeaders(requestOrigin, options);
-    return null;
-  };
+  return new Response(null, { status: 204, headers });
 }
-
-// Production CORS
-const productionCors = createCorsMiddleware({
-  origin: (origin) => {
-    const allowed = [
-      "https://myapp.com",
-      "https://www.myapp.com",
-      "https://app.myapp.com",
-    ];
-    return allowed.includes(origin);
-  },
-  credentials: true,
-});
 ```
 
 ## XSS Prevention
 
 ### Content Sanitization
 
+> **Note:** The sanitization utilities below are recommended patterns. They are not included in the generated template — create them as needed and install `isomorphic-dompurify` if you use `sanitizeHtml`.
+
 ```typescript
-// src/lib/sanitize.ts
+// src/lib/sanitize.ts (not in template — create as needed)
 import DOMPurify from "isomorphic-dompurify";
 
 export function sanitizeHtml(dirty: string): string {
@@ -662,8 +578,10 @@ export function SafeHtml({ html }: { html: string }) {
 
 ### URL Validation
 
+> **Note:** The URL validation utilities below are recommended patterns. They are not included in the generated template — create them as needed.
+
 ```typescript
-// src/lib/validation/url.ts
+// src/lib/validation/url.ts (not in template — create as needed)
 export function isValidUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -692,8 +610,10 @@ export function sanitizeRedirectUrl(url: string): string {
 
 ### Secure File Handling
 
+> **Note:** The `UploadService` class below is a recommended pattern. It is not included in the generated template — create it as needed.
+
 ```typescript
-// src/server/services/upload.service.ts
+// src/server/services/upload.service.ts (not in template — create as needed)
 import { createHash } from "crypto";
 
 interface UploadOptions {
@@ -774,8 +694,10 @@ export class UploadService {
 
 ### Audit Logging
 
+> **Note:** The `AuditService` class below is a recommended pattern for production monitoring. It is not included in the generated template — create it as needed.
+
 ```typescript
-// src/server/services/audit.service.ts
+// src/server/services/audit.service.ts (not in template — create as needed)
 interface AuditLog {
   timestamp: Date;
   userId?: string;

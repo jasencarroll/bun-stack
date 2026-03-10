@@ -515,25 +515,23 @@ crontab -e
 ```typescript
 // src/server/routes/health.ts
 export const health = {
-  "/": {
-    GET: async () => {
-      try {
-        // Check database
-        await db.execute(sql`SELECT 1`);
-        
-        return Response.json({
-          status: "healthy",
-          timestamp: new Date().toISOString(),
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-        });
-      } catch (error) {
-        return Response.json(
-          { status: "unhealthy", error: error.message },
-          { status: 503 }
-        );
-      }
-    },
+  GET: async () => {
+    try {
+      // Check database
+      await db.execute(sql`SELECT 1`);
+
+      return Response.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+      });
+    } catch (error) {
+      return Response.json(
+        { status: "unhealthy", error: error.message },
+        { status: 503 }
+      );
+    }
   },
 };
 ```
@@ -613,7 +611,9 @@ location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
 // Enable Bun compression
 Bun.serve({
   port: 3000,
-  fetch: router.fetch,
+  fetch(req) {
+    // Route handling logic from src/server/index.ts
+  },
   compression: true, // Enable gzip/br
 });
 ```

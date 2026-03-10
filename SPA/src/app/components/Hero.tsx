@@ -1,5 +1,5 @@
-import React from "react";
 import { ArrowDownIcon, CheckIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import React from "react";
 
 export function Hero() {
   const [copied, setCopied] = React.useState(false);
@@ -65,10 +65,12 @@ export function Hero() {
           Build production-ready fullstack apps in seconds, not hours. Convention over configuration
           meets modern JavaScript.
         </p>
-        
+
         <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
-          Identified the gap between Rails productivity and modern JS tooling.<br />
-          Perfect for MVPs, hackathons, and rapid prototyping.<br />
+          Identified the gap between Rails productivity and modern JS tooling.
+          <br />
+          Perfect for MVPs, hackathons, and rapid prototyping.
+          <br />
           <span className="text-bun-accent"> 30-second setup instead of 30 minutes.</span>
         </p>
 
@@ -79,6 +81,7 @@ export function Hero() {
                 <span className="text-green-400">$</span> {command}
               </code>
               <button
+                type="button"
                 onClick={copyToClipboard}
                 className="ml-2 p-1.5 hover:bg-white/10 rounded transition-colors"
                 title="Copy to clipboard"
@@ -97,7 +100,6 @@ export function Hero() {
             )}
           </div>
         </div>
-
 
         <div className="flex flex-col items-center gap-4 mb-12">
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -121,15 +123,25 @@ export function Hero() {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block hover:opacity-90 transition-opacity"
-            style={{ height: '48px' }}
+            style={{ height: "48px" }}
           >
-            <img src="https://railway.com/button.svg" alt="Deploy on Railway" style={{ height: '100%', width: 'auto' }} />
+            <img
+              src="https://railway.com/button.svg"
+              alt="Deploy on Railway"
+              style={{ height: "100%", width: "auto" }}
+            />
           </a>
         </div>
-        
+
         <div className="text-sm text-gray-500">
-          Created by <a href="https://jasenc.dev" className="text-bun-accent hover:text-purple-400 transition-colors">an engineer with AI and business background</a>, 
-          accelerating software development for teams and startups.
+          Created by{" "}
+          <a
+            href="https://jasenc.dev"
+            className="text-bun-accent hover:text-purple-400 transition-colors"
+          >
+            an engineer with AI and business background
+          </a>
+          , accelerating software development for teams and startups.
         </div>
       </div>
 

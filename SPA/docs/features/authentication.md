@@ -7,7 +7,7 @@ Create Bun Stack includes a complete authentication system with JWT tokens, secu
 The authentication system provides:
 
 - 🔐 **JWT-based authentication** - Stateless, scalable authentication
-- 🔒 **Secure password hashing** - Using Bun's built-in Argon2id
+- 🔒 **Secure password hashing** - Using Bun's built-in password hashing
 - 🛡️ **CSRF protection** - Double-submit cookie pattern
 - 👤 **User management** - Registration, login, profile updates
 - 🎭 **Role-based access** - Admin and user roles
@@ -35,7 +35,7 @@ sequenceDiagram
 
 ### Security Architecture
 
-1. **Password Hashing**: Argon2id with salt
+1. **Password Hashing**: Bun.password.hash (bcrypt)
 2. **JWT Tokens**: Signed with HS256
 3. **CSRF Protection**: Token in cookie + header
 4. **Secure Headers**: XSS, clickjacking protection
@@ -57,6 +57,7 @@ Content-Type: application/json
 // Response
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
   "user": {
     "id": "123",
     "email": "user@example.com",
@@ -80,6 +81,7 @@ Content-Type: application/json
 // Response
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
   "user": {
     "id": "123",
     "email": "user@example.com",
@@ -101,32 +103,18 @@ Authorization: Bearer <token>
 }
 ```
 
-### Get Current User
-
-```typescript
-GET /api/auth/me
-Authorization: Bearer <token>
-
-// Response
-{
-  "id": "123",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "role": "user"
-}
-```
-
 ## Frontend Usage
 
 ### useAuth Hook
 
 ```typescript
+// src/app/hooks/useAuth.ts
 import { useAuth } from "@/app/hooks/useAuth";
 
 export function MyComponent() {
-  const { user, isLoading, login, logout, register } = useAuth();
+  const { user, loading, login, register, logout } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return <div>Loading...</div>;
   }
 
@@ -143,16 +131,29 @@ export function MyComponent() {
 }
 ```
 
+Note: `login(email, password)` and `register(name, email, password)` take positional arguments and return `{ success, user?, error? }` objects (they never throw). Example:
+
+```typescript
+const result = await login(email, password);
+if (!result.success) {
+  setError(result.error || "Login failed");
+}
+```
+
+The hook stores the JWT token in `localStorage`.
+
 ### Protected Routes
+
+> **Note:** The `ProtectedRoute` component below is a recommended pattern. It is not included in the generated template — create it as needed.
 
 ```typescript
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/app/hooks/useAuth";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return <div>Loading...</div>;
   }
 
@@ -164,17 +165,19 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 // Usage
-<Route 
-  path="/dashboard" 
+<Route
+  path="/dashboard"
   element={
     <ProtectedRoute>
       <Dashboard />
     </ProtectedRoute>
-  } 
+  }
 />
 ```
 
 ### Login Form
+
+> **Note:** The `LoginForm` component below is a recommended pattern. The generated template includes `LoginPage.tsx` with a similar implementation.
 
 ```typescript
 import { useState } from "react";
@@ -187,14 +190,13 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
-    try {
-      await login({
-        email: formData.get("email") as string,
-        password: formData.get("password") as string,
-      });
-    } catch (err) {
-      setError("Invalid email or password");
+
+    const result = await login(
+      formData.get("email") as string,
+      formData.get("password") as string,
+    );
+    if (!result.success) {
+      setError(result.error || "Invalid email or password");
     }
   };
 
@@ -219,44 +221,68 @@ export async function hashPassword(password: string): Promise<string> {
   if (!password || password.length === 0) {
     throw new Error("Password cannot be empty");
   }
-  
-  // Bun uses Argon2id by default
-  return await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 4,
-    timeCost: 3,
-  });
+  return await Bun.password.hash(password);
 }
 
 export async function verifyPassword(
   password: string,
-  hash: string
+  hashedPassword: string
 ): Promise<boolean> {
-  return await Bun.password.verify(password, hash);
+  if (!hashedPassword) return false;
+  try {
+    return await Bun.password.verify(password, hashedPassword);
+  } catch {
+    return false;
+  }
 }
 ```
 
 ### JWT Generation
 
 ```typescript
-// src/lib/jwt.ts
-import jwt from "jsonwebtoken";
+// src/lib/crypto.ts
+import { createHmac } from "node:crypto";
+import { env } from "../config/env";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_EXPIRY = 60 * 60 * 24; // 24 hours in seconds
 
-export function generateToken(payload: {
-  id: string;
-  email: string;
-  role: string;
-}): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-  });
+export function generateToken(payload: Record<string, unknown>): string {
+  const header = { alg: "HS256", typ: "JWT" };
+
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+  const encodedPayload = Buffer.from(
+    JSON.stringify({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY,
+    })
+  ).toString("base64url");
+
+  const signature = createHmac("sha256", env.JWT_SECRET)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
-export function verifyToken(token: string): any {
-  return jwt.verify(token, JWT_SECRET);
+export function verifyToken(token: string): Record<string, unknown> | null {
+  try {
+    const [encodedHeader, encodedPayload, signature] = token.split(".");
+    if (!encodedHeader || !encodedPayload || !signature) return null;
+
+    const testSignature = createHmac("sha256", env.JWT_SECRET)
+      .update(`${encodedHeader}.${encodedPayload}`)
+      .digest("base64url");
+
+    if (signature !== testSignature) return null;
+
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
 }
 ```
 
@@ -264,35 +290,42 @@ export function verifyToken(token: string): any {
 
 ```typescript
 // src/server/middleware/auth.ts
-import { verifyToken } from "@/lib/jwt";
+import { verifyToken } from "@/lib/crypto";
+import type { AuthUser } from "@/lib/types";
 
-export function requireAuth(req: Request): Response | null {
-  const token = extractToken(req);
-  
-  if (!token) {
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-  
-  try {
-    const payload = verifyToken(token);
-    (req as any).user = payload;
-    return null; // Continue to next handler
-  } catch (error) {
-    return Response.json(
-      { error: "Invalid token" },
-      { status: 401 }
-    );
+declare global {
+  interface Request {
+    user?: AuthUser;
   }
 }
 
-function extractToken(req: Request): string | null {
-  const auth = req.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    return auth.slice(7);
+export function requireAuth(req: Request): Response | null {
+  const authHeader = req.headers.get("Authorization");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
+
+  const token = authHeader.substring(7);
+  const payload = verifyToken(token);
+
+  if (!payload || !payload.userId) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  req.user = {
+    id: payload.userId as string,
+    email: payload.email as string,
+    name: payload.name as string,
+    role: payload.role as "user" | "admin",
+  };
+
   return null;
 }
 ```
@@ -301,36 +334,41 @@ function extractToken(req: Request): string | null {
 
 ```typescript
 // src/server/middleware/csrf.ts
-export async function csrfMiddleware(req: Request): Promise<Response | null> {
-  // Skip for non-mutation methods
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    return null;
+import { randomBytes } from "node:crypto";
+
+// WARNING: In-memory CSRF store. Tokens are lost on server restart and not shared
+// across instances. For production multi-instance deployments, replace with Redis
+// or database-backed storage.
+const csrfTokenStore = new Map<string, { token: string; expires: number }>();
+
+export function generateCsrfToken(): { token: string; cookie: string } {
+  const token = randomBytes(32).toString("hex");
+  const cookie = randomBytes(32).toString("hex");
+
+  csrfTokenStore.set(cookie, {
+    token,
+    expires: Date.now() + 24 * 60 * 60 * 1000,
+  });
+
+  cleanupExpiredTokens();
+  return { token, cookie };
+}
+
+export function validateCsrfToken(cookie: string | null, token: string | null): boolean {
+  if (!cookie || !token) return false;
+  const stored = csrfTokenStore.get(cookie);
+  if (!stored) return false;
+  if (stored.expires < Date.now()) {
+    csrfTokenStore.delete(cookie);
+    return false;
   }
-  
-  const headerToken = req.headers.get("x-csrf-token");
-  const cookieToken = getCookie(req, "csrf-token");
-  
-  if (!headerToken || !cookieToken) {
-    return Response.json(
-      { error: "CSRF token missing" },
-      { status: 403 }
-    );
-  }
-  
-  const isValid = await Bun.password.verify(headerToken, cookieToken);
-  
-  if (!isValid) {
-    return Response.json(
-      { error: "CSRF token mismatch" },
-      { status: 403 }
-    );
-  }
-  
-  return null;
+  return stored.token === token;
 }
 ```
 
 ## Role-Based Access Control
+
+> **Note:** The examples below show recommended patterns for extending your application. These files are not included in the generated template — you'll create them as needed.
 
 ### Defining Roles
 
@@ -364,54 +402,58 @@ export const permissions = {
 
 ### Admin Middleware
 
+The `requireAdmin` function is included in the generated template alongside `requireAuth`:
+
 ```typescript
 // src/server/middleware/auth.ts
 export function requireAdmin(req: Request): Response | null {
   const authResponse = requireAuth(req);
   if (authResponse) return authResponse;
-  
-  const user = (req as any).user;
-  if (user.role !== "admin") {
-    return Response.json(
-      { error: "Admin access required" },
-      { status: 403 }
-    );
+
+  if (req.user?.role !== "admin") {
+    return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  
+
   return null;
 }
 ```
 
 ### Protected Admin Routes
 
+In the generated template, admin protection is applied imperatively in `src/server/index.ts`:
+
 ```typescript
-// src/server/routes/admin.ts
+// src/server/index.ts (how admin routes are actually protected)
+if (req.method === "GET" && path === "/api/users") {
+  const adminCheck = requireAdmin(req);
+  if (adminCheck) {
+    response = adminCheck;
+  } else {
+    response = await handlers.GET(req);
+  }
+}
+```
+
+> **Note:** The route definition pattern below shows a recommended way to organize admin routes as a separate module — it is not included in the generated template.
+
+```typescript
+// src/server/routes/admin.ts (not in template — create as needed)
 import { requireAdmin } from "../middleware/auth";
 
-export const admin = {
-  "/users": {
-    GET: [
-      requireAdmin,
-      async () => {
-        const users = await userRepository.findAll();
-        return Response.json(users);
-      },
-    ],
-  },
-  "/users/:id/role": {
-    PUT: [
-      requireAdmin,
-      async (req: Request, { params }) => {
-        const { role } = await req.json();
-        const user = await userRepository.updateRole(params.id, role);
-        return Response.json(user);
-      },
-    ],
-  },
-};
+export async function handleAdminUsers(req: Request) {
+  const adminCheck = requireAdmin(req);
+  if (adminCheck) return adminCheck;
+  const users = await userRepository.findAll();
+  return Response.json(users);
+}
 ```
 
 ## Security Best Practices
+
+> **Note:** The examples below show recommended patterns for extending your application. These files are not included in the generated template — you'll create them as needed.
 
 ### 1. Password Requirements
 
@@ -447,18 +489,22 @@ export function validatePassword(password: string): string[] {
 ### 2. Rate Limiting
 
 ```typescript
-// Applied to auth routes
-const authRateLimit = createRateLimit({
-  window: 15 * 60 * 1000, // 15 minutes
+// Applied to auth routes (from src/server/middleware/rate-limit.ts)
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts
-  message: "Too many login attempts",
+  message: "Too many authentication attempts, please try again later",
 });
 ```
 
 ### 3. Token Storage
 
+The generated template stores the JWT token in `localStorage` via the `useAuth` hook. For higher security, consider storing tokens in memory instead:
+
+> **Note:** The in-memory token storage pattern below is a recommended security hardening — the generated template uses `localStorage`.
+
 ```typescript
-// Store in memory, not localStorage
+// Recommended: store in memory instead of localStorage (not in template)
 let token: string | null = null;
 
 export function setToken(newToken: string) {
@@ -488,10 +534,12 @@ const securityHeaders = {
 
 ## Session Management
 
+> **Note:** The examples below show recommended patterns for extending your application. These files are not included in the generated template — you'll create them as needed.
+
 ### Token Refresh
 
 ```typescript
-// src/app/hooks/useAuth.ts
+// Recommended token refresh pattern (not in template — create as needed)
 export function useAuth() {
   const refreshToken = async () => {
     try {
@@ -595,7 +643,6 @@ describe("Authentication", () => {
    - Include X-CSRF-Token header
 
 3. **Password hashing slow**:
-   - Adjust Argon2 parameters
    - Use async operations
    - Consider caching
 

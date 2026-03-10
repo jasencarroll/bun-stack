@@ -20,10 +20,8 @@ Routes are defined as objects with HTTP methods as keys:
 ```typescript
 // src/server/routes/products.ts
 export const products = {
-  "/": {
-    GET: getAllProducts,      // GET /api/products
-    POST: createProduct,      // POST /api/products
-  },
+  GET: getAllProducts,        // GET /api/products
+  POST: createProduct,        // POST /api/products
   "/:id": {
     GET: getProduct,          // GET /api/products/123
     PUT: updateProduct,       // PUT /api/products/123
@@ -38,21 +36,20 @@ export const products = {
 
 ### Registering Routes
 
-Routes are registered in the central router:
+Routes are wired imperatively in `src/server/index.ts` using `if` statements (there is no `router.ts` or `createRouter`):
 
 ```typescript
-// src/server/router.ts
-import { products } from "./routes/products";
-import { users } from "./routes/users";
-import { auth } from "./routes/auth";
+// src/server/index.ts
+import * as routes from "./routes";
 
-const routes = {
-  "/api/auth": auth,
-  "/api/users": users,
-  "/api/products": products,
-};
-
-export const router = createRouter(routes);
+// Inside Bun.serve fetch handler:
+if (path.startsWith("/api/users")) {
+  const handlers = routes.users;
+  if (req.method === "GET" && path === "/api/users") {
+    response = await handlers.GET(req);
+  }
+  // ...
+}
 ```
 
 ### Route Handlers
@@ -66,12 +63,11 @@ async function getAllProducts(req: Request): Promise<Response> {
   return Response.json(products);
 }
 
-// Handler with parameters
+// Handler with parameters (params are on req via type intersection)
 async function getProduct(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: Request & { params: { id: string } }
 ): Promise<Response> {
-  const product = await productRepository.findById(params.id);
+  const product = await productRepository.findById(req.params.id);
   
   if (!product) {
     return Response.json(
@@ -123,88 +119,66 @@ async function createProduct(req: Request): Promise<Response> {
 
 ### Applying Middleware
 
-Middleware can be applied at the route level:
+In the generated template, middleware is applied imperatively in `src/server/index.ts` and in route handlers — not as arrays:
 
 ```typescript
-import { requireAuth, requireAdmin } from "../middleware/auth";
-import { validateBody } from "../middleware/validation";
-import { rateLimit } from "../middleware/rate-limit";
+// In src/server/index.ts — auth middleware applied before route handler
+if (req.method === "GET" && path === "/api/users") {
+  const adminCheck = requireAdmin(req);
+  if (adminCheck) {
+    response = adminCheck;
+  } else {
+    response = await handlers.GET(req);
+  }
+}
 
-export const products = {
-  "/": {
-    // Public route
-    GET: getAllProducts,
-    
-    // Protected route with middleware chain
-    POST: [
-      requireAuth,
-      requireAdmin,
-      validateBody(createProductSchema),
-      createProduct,
-    ],
-  },
-  "/:id": {
-    // Mix of public and protected
-    GET: getProduct,
-    PUT: [requireAuth, requireAdmin, updateProduct],
-    DELETE: [requireAuth, requireAdmin, deleteProduct],
-  },
-};
+// In src/server/routes/auth.ts — rate limiting and validation in handler
+POST: async (req: Request) => {
+  const rateLimitResponse = authRateLimiter(req);
+  if (rateLimitResponse) return rateLimitResponse;
+
+  const body = await validateRequest(req, loginSchema);
+  if (body instanceof Response) return body;
+
+  // ... handle login
+}
 ```
 
-### Creating Middleware
+### Validation Utility
 
-Middleware functions return `null` to continue or a `Response` to stop:
+The template provides `validateRequest` as a utility function (not middleware factory):
 
 ```typescript
 // src/server/middleware/validation.ts
-export function validateBody(schema: ZodSchema) {
-  return async function (req: Request): Promise<Response | null> {
-    try {
-      const body = await req.json();
-      const result = schema.safeParse(body);
-      
-      if (!result.success) {
-        return Response.json(
-          { error: "Validation failed", details: result.error },
-          { status: 400 }
-        );
-      }
-      
-      // Attach validated data to request
-      (req as any).validatedBody = result.data;
-      return null; // Continue to next handler
-    } catch (error) {
-      return Response.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+export async function validateRequest<T>(
+  req: Request,
+  schema: z.ZodSchema<T>
+): Promise<T | Response> {
+  try {
+    const body = await req.json();
+    return schema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json({ errors: error.errors }, { status: 400 });
     }
-  };
+    return new Response("Invalid request", { status: 400 });
+  }
 }
 ```
 
 ### Global Middleware
 
-Apply middleware to all routes:
+Global middleware (CORS, CSRF, security headers) is applied in `src/server/index.ts` via a `wrapResponse()` helper:
 
 ```typescript
-// src/server/router.ts
-export function createRouter(routes: Routes) {
-  return {
-    async fetch(req: Request): Promise<Response> {
-      // Global middleware
-      const corsResponse = await corsMiddleware(req);
-      if (corsResponse) return corsResponse;
-      
-      const securityResponse = await securityMiddleware(req);
-      if (securityResponse) return securityResponse;
-      
-      // Route handling
-      return handleRoute(req, routes);
-    },
-  };
-}
+// src/server/index.ts
+const wrapResponse = (response: Response): Response => {
+  let finalResponse = response;
+  if (path.startsWith("/api")) {
+    finalResponse = applyCorsHeaders(finalResponse, origin);
+  }
+  return applySecurityHeaders(finalResponse, req);
+};
 ```
 
 ## Route Parameters
@@ -217,12 +191,11 @@ export function createRouter(routes: Routes) {
   GET: getProductByCategoryAndId,
 }
 
-// Handler
+// Handler — params are on req via type intersection
 async function getProductByCategoryAndId(
-  req: Request,
-  { params }: { params: { category: string; id: string } }
+  req: Request & { params: { category: string; id: string } }
 ): Promise<Response> {
-  const { category, id } = params;
+  const { category, id } = req.params;
   // Use parameters
 }
 ```
@@ -364,15 +337,17 @@ export function App() {
 
 ### Protected Routes
 
+> **Note:** The `ProtectedRoute` component below is a recommended pattern. It is not included in the generated template — create it as needed.
+
 ```typescript
-// src/app/components/ProtectedRoute.tsx
+// src/app/components/ProtectedRoute.tsx (not in template — create as needed)
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/app/hooks/useAuth";
 
 export function ProtectedRoute() {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
     return <div>Loading...</div>;
   }
   
@@ -567,9 +542,7 @@ export function useCreateProduct() {
 ```typescript
 // Backend nested routes
 export const products = {
-  "/": {
-    GET: getAllProducts,
-  },
+  GET: getAllProducts,
   "/:productId/variants": {
     GET: getProductVariants,
     POST: createVariant,
@@ -596,8 +569,8 @@ export const products = {
 // Catch-all routes
 export const cms = {
   "/*": {
-    GET: async (req: Request, { params }: { params: { "*": string } }) => {
-      const path = params["*"];
+    GET: async (req: Request & { params: { "*": string } }) => {
+      const path = req.params["*"];
       const page = await cmsRepository.findByPath(path);
       
       if (!page) {

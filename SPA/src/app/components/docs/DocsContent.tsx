@@ -1,6 +1,5 @@
-import React, { useEffect } from "react";
-import { CodeBlock } from "./CodeBlock";
 import Prism from "prismjs";
+import { useEffect } from "react";
 
 // Import Prism languages
 import "prismjs/components/prism-typescript";
@@ -23,7 +22,7 @@ export function DocsContent({ html, headings = [] }: DocsContentProps) {
   useEffect(() => {
     // Apply syntax highlighting
     Prism.highlightAll();
-    
+
     // Add copy buttons to code blocks after render
     const codeBlocks = document.querySelectorAll("pre code");
     codeBlocks.forEach((block) => {
@@ -51,9 +50,9 @@ export function DocsContent({ html, headings = [] }: DocsContentProps) {
         const element = document.getElementById(hash);
         if (element) {
           // Account for fixed header height
-          const yOffset = -80; 
+          const yOffset = -80;
           const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-          window.scrollTo({ top: y, behavior: 'smooth' });
+          window.scrollTo({ top: y, behavior: "smooth" });
         }
       }
     };
@@ -61,24 +60,24 @@ export function DocsContent({ html, headings = [] }: DocsContentProps) {
     // Handle clicks on table of contents links
     const handleTocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'A' && target.getAttribute('href')?.startsWith('#')) {
+      if (target.tagName === "A" && target.getAttribute("href")?.startsWith("#")) {
         e.preventDefault();
-        const hash = target.getAttribute('href')?.slice(1);
+        const hash = target.getAttribute("href")?.slice(1);
         if (hash) {
           const element = document.getElementById(hash);
           if (element) {
             const yOffset = -80;
             const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-            window.scrollTo({ top: y, behavior: 'smooth' });
+            window.scrollTo({ top: y, behavior: "smooth" });
             // Update URL hash
-            window.history.pushState(null, '', `#${hash}`);
+            window.history.pushState(null, "", `#${hash}`);
           }
         }
       }
     };
 
     // Add click listener to document
-    document.addEventListener('click', handleTocClick);
+    document.addEventListener("click", handleTocClick);
 
     handleHashChange();
     window.addEventListener("hashchange", handleHashChange);
@@ -93,7 +92,7 @@ export function DocsContent({ html, headings = [] }: DocsContentProps) {
     <div className="flex gap-8">
       {/* Main content */}
       <div className="flex-1 min-w-0 max-w-full overflow-hidden">
-        <div 
+        <div
           className="prose prose-invert max-w-none 
             prose-headings:scroll-mt-28 prose-headings:font-display prose-headings:font-normal prose-headings:text-bun-light
             lg:prose-headings:scroll-mt-[8.5rem] 

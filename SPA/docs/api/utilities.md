@@ -7,65 +7,54 @@ Create Bun Stack includes a collection of utility functions and helpers for comm
 ### JWT Utilities
 
 ```typescript
-// src/lib/jwt.ts
-import jwt from "jsonwebtoken";
+// src/lib/crypto.ts
+import { createHmac } from "node:crypto";
+import { env } from "../config/env";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_EXPIRY = 60 * 60 * 24; // 24 hours in seconds
 
 /**
- * Generate a JWT token for a user
+ * Generate a JWT token using HMAC-SHA256
  */
-export function generateToken(payload: {
-  id: string;
-  email: string;
-  role: string;
-}): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-    issuer: "create-bun-stack",
-  });
+export function generateToken(payload: Record<string, unknown>): string {
+  const header = { alg: "HS256", typ: "JWT" };
+
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+  const encodedPayload = Buffer.from(
+    JSON.stringify({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY,
+    })
+  ).toString("base64url");
+
+  const signature = createHmac("sha256", env.JWT_SECRET)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
 }
 
 /**
  * Verify and decode a JWT token
  */
-export function verifyToken(token: string): JWTPayload {
+export function verifyToken(token: string): Record<string, unknown> | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
-  } catch (error) {
-    throw new Error("Invalid token");
-  }
-}
+    const [encodedHeader, encodedPayload, signature] = token.split(".");
+    if (!encodedHeader || !encodedPayload || !signature) return null;
 
-/**
- * Decode token without verification (for debugging)
- */
-export function decodeToken(token: string): any {
-  return jwt.decode(token);
-}
+    const testSignature = createHmac("sha256", env.JWT_SECRET)
+      .update(`${encodedHeader}.${encodedPayload}`)
+      .digest("base64url");
 
-/**
- * Extract token from Authorization header
- */
-export function extractToken(req: Request): string | null {
-  const auth = req.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    return auth.slice(7);
-  }
-  return null;
-}
+    if (signature !== testSignature) return null;
 
-/**
- * Check if token is expired
- */
-export function isTokenExpired(token: string): boolean {
-  try {
-    const decoded = jwt.decode(token) as any;
-    if (!decoded?.exp) return true;
-    return decoded.exp * 1000 < Date.now();
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
   } catch {
-    return true;
+    return null;
   }
 }
 ```
@@ -76,18 +65,13 @@ export function isTokenExpired(token: string): boolean {
 // src/lib/crypto.ts
 
 /**
- * Hash a password using Argon2id
+ * Hash a password using Bun's built-in hashing
  */
 export async function hashPassword(password: string): Promise<string> {
   if (!password || password.length === 0) {
     throw new Error("Password cannot be empty");
   }
-  
-  return await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 19456,  // 19 MB
-    timeCost: 2,        // 2 iterations
-  });
+  return await Bun.password.hash(password);
 }
 
 /**
@@ -95,10 +79,22 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function verifyPassword(
   password: string,
-  hash: string
+  hashedPassword: string
 ): Promise<boolean> {
-  return await Bun.password.verify(password, hash);
+  if (!hashedPassword) return false;
+  try {
+    return await Bun.password.verify(password, hashedPassword);
+  } catch {
+    return false;
+  }
 }
+
+```
+
+> **Note:** The `generatePassword` and `checkPasswordStrength` functions below are recommended patterns not included in the generated template — create them as needed.
+
+```typescript
+// src/lib/validation.ts (not in template — create as needed)
 
 /**
  * Generate a random password
@@ -106,33 +102,29 @@ export async function verifyPassword(
 export function generatePassword(length: number = 16): string {
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
   let password = "";
-  
+
   for (let i = 0; i < length; i++) {
     password += charset[Math.floor(Math.random() * charset.length)];
   }
-  
+
   return password;
 }
 
 /**
  * Check password strength
  */
-export interface PasswordStrength {
-  score: number;      // 0-5
+export function checkPasswordStrength(password: string): {
+  score: number;
   feedback: string[];
   isStrong: boolean;
-}
-
-export function checkPasswordStrength(password: string): PasswordStrength {
+} {
   let score = 0;
   const feedback: string[] = [];
 
-  // Length
   if (password.length >= 12) score += 2;
   else if (password.length >= 8) score += 1;
   else feedback.push("Use at least 8 characters");
 
-  // Character types
   if (/[a-z]/.test(password)) score += 0.5;
   else feedback.push("Include lowercase letters");
 
@@ -155,10 +147,12 @@ export function checkPasswordStrength(password: string): PasswordStrength {
 
 ## Validation Utilities
 
+> **Note:** The utilities below show recommended patterns. Only `src/lib/crypto.ts` and `src/lib/date.ts` are included in the generated template — create others as needed.
+
 ### Common Validators
 
 ```typescript
-// src/lib/validation.ts
+// src/lib/validation.ts (not in template — create as needed)
 
 /**
  * Validate email format
@@ -220,8 +214,10 @@ export function isValidFileType(
 
 ### Zod Helpers
 
+> **Note:** The Zod helpers below are recommended patterns not included in the generated template. The template defines schemas inline in route handlers.
+
 ```typescript
-// src/lib/validation/zod-helpers.ts
+// src/lib/validation/zod-helpers.ts (not in template — create as needed)
 import { z } from "zod";
 
 /**
@@ -267,10 +263,12 @@ export function paginatedSchema<T extends z.ZodObject<any>>(
 
 ## String Utilities
 
+> **Note:** The string utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### String Manipulation
 
 ```typescript
-// src/lib/utils/string.ts
+// src/lib/utils/string.ts (not in template — create as needed)
 
 /**
  * Convert string to slug
@@ -332,84 +330,30 @@ export function randomString(
 ### Date Formatting
 
 ```typescript
-// src/lib/utils/date.ts
-
-/**
- * Format date to readable string
- */
-export function formatDate(
-  date: Date | string,
-  options: Intl.DateTimeFormatOptions = {}
-): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    ...options,
-  }).format(d);
+// src/lib/date.ts
+export function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString();
 }
 
-/**
- * Format relative time (e.g., "2 hours ago")
- */
-export function formatRelativeTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-  if (days < 30) return `${days} day${days > 1 ? "s" : ""} ago`;
-  
-  return formatDate(d);
+export function formatDateTime(date: Date | string): string {
+  return new Date(date).toLocaleString();
 }
 
-/**
- * Get start and end of day
- */
-export function getDayBounds(date: Date = new Date()): {
-  start: Date;
-  end: Date;
-} {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
-  
-  return { start, end };
-}
-
-/**
- * Add days to date
- */
-export function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-/**
- * Check if date is in past
- */
-export function isPast(date: Date | string): boolean {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d < new Date();
+export function isToday(date: Date | string): boolean {
+  const today = new Date();
+  const compareDate = new Date(date);
+  return today.toDateString() === compareDate.toDateString();
 }
 ```
 
 ## Number Utilities
 
+> **Note:** The number utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### Number Formatting
 
 ```typescript
-// src/lib/utils/number.ts
+// src/lib/utils/number.ts (not in template — create as needed)
 
 /**
  * Format currency
@@ -480,10 +424,12 @@ export function round(num: number, decimals: number = 2): number {
 
 ## Array/Object Utilities
 
+> **Note:** The array/object utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### Array Helpers
 
 ```typescript
-// src/lib/utils/array.ts
+// src/lib/utils/array.ts (not in template — create as needed)
 
 /**
  * Chunk array into smaller arrays
@@ -542,7 +488,7 @@ export function sample<T>(array: T[], count: number = 1): T[] {
 ### Object Helpers
 
 ```typescript
-// src/lib/utils/object.ts
+// src/lib/utils/object.ts (not in template — create as needed)
 
 /**
  * Deep clone object
@@ -616,10 +562,12 @@ function isObject(item: any): item is object {
 
 ## HTTP Utilities
 
+> **Note:** The HTTP utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### Request Helpers
 
 ```typescript
-// src/lib/utils/http.ts
+// src/lib/utils/http.ts (not in template — create as needed)
 
 /**
  * Get client IP address
@@ -715,10 +663,12 @@ export async function parseFormData(
 
 ## File System Utilities
 
+> **Note:** The file system utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### File Helpers
 
 ```typescript
-// src/lib/utils/file.ts
+// src/lib/utils/file.ts (not in template — create as needed)
 
 /**
  * Ensure directory exists
@@ -785,10 +735,12 @@ export function isSafePath(path: string, root: string): boolean {
 
 ## Crypto Utilities
 
+> **Note:** The crypto utilities below are recommended patterns not included in the generated template — create them as needed. Note that `generateToken` below generates random hex strings (different from the JWT `generateToken` in `src/lib/crypto.ts`).
+
 ### Hashing and Encryption
 
 ```typescript
-// src/lib/utils/crypto.ts
+// src/lib/utils/crypto.ts (not in template — create as needed)
 import { createHash, randomBytes } from "crypto";
 
 /**
@@ -837,10 +789,12 @@ export function secureCompare(a: string, b: string): boolean {
 
 ## React Utilities
 
+> **Note:** The custom hooks below are recommended patterns. Only `useAuth` is included in the generated template — create others as needed.
+
 ### Custom Hooks
 
 ```typescript
-// src/app/hooks/useDebounce.ts
+// src/app/hooks/useDebounce.ts (not in template — create as needed)
 import { useEffect, useState } from "react";
 
 /**
@@ -860,7 +814,7 @@ export function useDebounce<T>(value: T, delay: number = 500): T {
   return debouncedValue;
 }
 
-// src/app/hooks/useLocalStorage.ts
+// src/app/hooks/useLocalStorage.ts (not in template — create as needed)
 /**
  * Sync state with localStorage
  */
@@ -893,8 +847,10 @@ export function useLocalStorage<T>(
 
 ### Class Name Utility
 
+> **Note:** This utility requires `clsx` and `tailwind-merge` packages, which are not included in the template by default.
+
 ```typescript
-// src/lib/utils/cn.ts
+// src/lib/utils/cn.ts (not in template — create as needed)
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -915,10 +871,12 @@ export function cn(...inputs: ClassValue[]) {
 
 ## Environment Utilities
 
+> **Note:** The environment utilities below are recommended patterns not included in the generated template. The template uses `src/config/env.ts` for environment configuration — create additional helpers as needed.
+
 ### Environment Helpers
 
 ```typescript
-// src/lib/utils/env.ts
+// src/lib/utils/env.ts (not in template — create as needed)
 
 /**
  * Get environment variable with type safety
@@ -976,10 +934,12 @@ export const env = {
 
 ## Performance Utilities
 
+> **Note:** The performance utilities below are recommended patterns not included in the generated template — create them as needed.
+
 ### Timing and Profiling
 
 ```typescript
-// src/lib/utils/performance.ts
+// src/lib/utils/performance.ts (not in template — create as needed)
 
 /**
  * Measure function execution time
@@ -1051,10 +1011,12 @@ export function memoize<T extends (...args: any[]) => any>(
 
 ## Testing Utilities
 
+> **Note:** The test helpers below are recommended patterns not included in the generated template — create them as needed.
+
 ### Test Helpers
 
 ```typescript
-// tests/utils/helpers.ts
+// tests/utils/helpers.ts (not in template — create as needed)
 
 /**
  * Wait for condition to be true

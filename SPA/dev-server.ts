@@ -1,6 +1,6 @@
+import { watch } from "node:fs";
+import { join } from "node:path";
 import { $ } from "bun";
-import { watch } from "fs";
-import { join } from "path";
 
 const srcDir = join(import.meta.dir, "src/app");
 const serverFile = join(import.meta.dir, "src/server/index.ts");
@@ -21,7 +21,7 @@ const server = Bun.spawn(["bun", "--hot", serverFile], {
 let rebuildTimeout: Timer | null = null;
 
 // Watch for changes
-const watcher = watch(srcDir, { recursive: true }, async (event, filename) => {
+const _watcher = watch(srcDir, { recursive: true }, async (_event, filename) => {
   if (!filename) return;
 
   // Clear existing timeout

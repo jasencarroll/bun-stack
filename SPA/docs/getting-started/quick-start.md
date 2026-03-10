@@ -112,24 +112,22 @@ Let's customize the home page:
 
 ```typescript
 export const hello = {
-  "/": {
-    GET: async () => {
-      return Response.json({ message: "Hello from my new route!" });
-    },
+  GET: async () => {
+    return Response.json({ message: "Hello from my new route!" });
   },
 };
 ```
 
-2. Register it in `src/server/router.ts`:
+2. Register it in `src/server/index.ts` by adding route handling in the `Bun.serve` fetch handler:
 
 ```typescript
-import { hello } from "./routes/hello";
-
-// Add to the routes object
-const routes = {
-  // ... existing routes
-  "/api/hello": hello,
-};
+// In the Bun.serve fetch handler, add:
+if (path.startsWith("/api/hello")) {
+  const handlers = routes.hello;
+  if (req.method === "GET" && path === "/api/hello") {
+    response = await handlers.GET(req);
+  }
+}
 ```
 
 3. Test your new route:

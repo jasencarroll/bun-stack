@@ -214,7 +214,7 @@ bunx npm-check-updates
 # .env
 NODE_ENV=development
 PORT=3000
-DATABASE_URL=sqlite://./app.db
+SQLITE_PATH=./db/app.db
 JWT_SECRET=development-secret-change-in-production
 ```
 

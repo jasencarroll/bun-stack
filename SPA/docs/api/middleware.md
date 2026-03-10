@@ -18,8 +18,12 @@ type Middleware = (
 
 ### Middleware Execution Order
 
+Global middleware is applied in `src/server/index.ts` via the `wrapResponse()` helper. Per-route middleware (auth, rate limiting, validation) is applied imperatively in route handlers.
+
 ```
-Request → CORS → Security → Rate Limit → Auth → Validation → Route Handler → Response
+Request → CORS Preflight → CSRF Protection → Route Handler → CORS Headers → Security Headers → Response
+                                                ↑
+                                    (per-route: Rate Limit → Auth → Validation)
 ```
 
 ## Built-in Middleware
@@ -32,34 +36,44 @@ Validates JWT token and adds user to request:
 
 ```typescript
 // src/server/middleware/auth.ts
-export function requireAuth(req: Request): Response | null {
-  const token = extractToken(req);
-  
-  if (!token) {
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-  
-  try {
-    const payload = verifyToken(token);
-    (req as any).user = payload;
-    return null; // Continue
-  } catch (error) {
-    return Response.json(
-      { error: "Invalid token" },
-      { status: 401 }
-    );
+import { verifyToken } from "@/lib/crypto";
+import type { AuthUser } from "@/lib/types";
+
+declare global {
+  interface Request {
+    user?: AuthUser;
   }
 }
 
-// Usage
-export const protected = {
-  "/data": {
-    GET: [requireAuth, handleGetData],
-  },
-};
+export function requireAuth(req: Request): Response | null {
+  const authHeader = req.headers.get("Authorization");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const token = authHeader.substring(7);
+  const payload = verifyToken(token);
+
+  if (!payload || !payload.userId) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  req.user = {
+    id: payload.userId as string,
+    email: payload.email as string,
+    name: payload.name as string,
+    role: payload.role as "user" | "admin",
+  };
+
+  return null;
+}
 ```
 
 #### `requireAdmin`
@@ -68,202 +82,202 @@ Requires admin role:
 
 ```typescript
 export function requireAdmin(req: Request): Response | null {
-  // First check auth
   const authResponse = requireAuth(req);
   if (authResponse) return authResponse;
-  
-  const user = (req as any).user;
-  if (user.role !== "admin") {
-    return Response.json(
-      { error: "Admin access required" },
-      { status: 403 }
-    );
+
+  if (req.user?.role !== "admin") {
+    return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  
-  return null;
-}
-```
 
-#### `optionalAuth`
-
-Adds user if authenticated but doesn't require it:
-
-```typescript
-export function optionalAuth(req: Request): Response | null {
-  const token = extractToken(req);
-  
-  if (token) {
-    try {
-      const payload = verifyToken(token);
-      (req as any).user = payload;
-    } catch {
-      // Invalid token, but continue without user
-    }
-  }
-  
   return null;
 }
 ```
 
 ### CSRF Protection
 
-#### `csrfMiddleware`
+#### `applyCsrfProtection`
 
 Validates CSRF tokens for mutations:
 
 ```typescript
 // src/server/middleware/csrf.ts
-export async function csrfMiddleware(req: Request): Promise<Response | null> {
-  // Skip for safe methods
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    return null;
+import { randomBytes } from "node:crypto";
+
+// WARNING: In-memory CSRF store. Tokens are lost on server restart and not shared
+// across instances. For production multi-instance deployments, replace with Redis
+// or database-backed storage.
+const csrfTokenStore = new Map<string, { token: string; expires: number }>();
+
+export function requiresCsrfProtection(req: Request): boolean {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  // Skip CSRF for GET, HEAD, OPTIONS requests
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return false;
+  // Skip for auth endpoints (login/register)
+  if (path === "/api/auth/login" || path === "/api/auth/register") return false;
+  // Skip for health check
+  if (path === "/api/health") return false;
+
+  return true;
+}
+
+export function applyCsrfProtection(req: Request): Response | null {
+  if (!requiresCsrfProtection(req)) return null;
+
+  const cookies = parseCookies(req.headers.get("Cookie") || "");
+  const csrfCookie = cookies["csrf-token"] || null;
+  const csrfToken = req.headers.get("X-CSRF-Token");
+
+  if (!validateCsrfToken(csrfCookie, csrfToken)) {
+    return Response.json({ error: "CSRF token validation failed" }, { status: 403 });
   }
-  
-  const cookieToken = getCookie(req, "csrf-token");
-  const headerToken = req.headers.get("x-csrf-token");
-  
-  if (!cookieToken || !headerToken) {
-    return Response.json(
-      { error: "CSRF token missing" },
-      { status: 403 }
-    );
-  }
-  
-  const isValid = await Bun.password.verify(headerToken, cookieToken);
-  
-  if (!isValid) {
-    return Response.json(
-      { error: "CSRF token mismatch" },
-      { status: 403 }
-    );
-  }
-  
+
   return null;
 }
 ```
 
 ### Rate Limiting
 
-#### `createRateLimit`
+#### `createRateLimiter`
 
 Factory for creating rate limit middleware:
 
 ```typescript
 // src/server/middleware/rate-limit.ts
 interface RateLimitOptions {
-  windowMs: number;       // Time window in milliseconds
-  max: number;            // Max requests per window
-  message?: string;       // Error message
-  keyGenerator?: (req: Request) => string;
-  skipIf?: (req: Request) => boolean;
-  onLimitReached?: (req: Request) => void;
+  windowMs?: number;  // Window size in milliseconds (default: 15 minutes)
+  max?: number;       // Max requests per window (default: 5)
+  message?: string;   // Error message
 }
 
-export function createRateLimit(options: RateLimitOptions) {
+export function createRateLimiter(options: RateLimitOptions = {}) {
   const {
-    windowMs,
-    max,
-    message = "Too many requests",
-    keyGenerator = getClientIp,
-    skipIf,
-    onLimitReached,
+    windowMs = 15 * 60 * 1000,
+    max = 5,
+    message = "Too many requests, please try again later",
   } = options;
 
-  const limits = new Map<string, { count: number; resetAt: number }>();
-
-  return function rateLimitMiddleware(req: Request): Response | null {
-    if (skipIf?.(req)) return null;
-
-    const key = keyGenerator(req);
-    const now = Date.now();
-
-    let limit = limits.get(key);
-    
-    if (!limit || limit.resetAt < now) {
-      limit = { count: 1, resetAt: now + windowMs };
-      limits.set(key, limit);
+  return (req: Request): Response | null => {
+    if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
       return null;
     }
 
-    if (limit.count >= max) {
-      onLimitReached?.(req);
-      
-      return Response.json(
-        { error: message },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil((limit.resetAt - now) / 1000)),
-            "X-RateLimit-Limit": String(max),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": new Date(limit.resetAt).toISOString(),
-          },
-        }
-      );
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
+    const now = Date.now();
+    const resetTime = now + windowMs;
+
+    let entry = rateLimitStore.get(ip);
+
+    if (!entry || entry.resetTime < now) {
+      entry = { count: 1, resetTime };
+      rateLimitStore.set(ip, entry);
+      return null;
     }
 
-    limit.count++;
+    entry.count++;
+
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      return new Response(JSON.stringify({ error: message }), {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(max),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(entry.resetTime),
+        },
+      });
+    }
+
     return null;
   };
 }
 
-// Usage examples
-const strictRateLimit = createRateLimit({
-  windowMs: 60 * 1000,  // 1 minute
-  max: 10,              // 10 requests
-  message: "Too many requests, please slow down",
+// Pre-configured rate limiters
+export const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many authentication attempts, please try again later",
 });
 
-const apiRateLimit = createRateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,
-  skipIf: (req) => {
-    const user = (req as any).user;
-    return user?.plan === "premium";
-  },
+export const strictAuthRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 requests per hour
+  message: "Too many failed login attempts, please try again later",
 });
 ```
 
 ### Security Headers
 
-#### `securityMiddleware`
+#### `applySecurityHeaders`
 
 Adds security headers to responses:
 
 ```typescript
-// src/server/middleware/security.ts
-export function securityMiddleware(req: Request): Response | null {
-  const headers = new Headers();
-  const isDev = process.env.NODE_ENV === "development";
+// src/server/middleware/security-headers.ts
+export function applySecurityHeaders(response: Response, req: Request): Response {
+  const headers = new Headers(response.headers);
+  const url = new URL(req.url);
+  const contentType = response.headers.get("Content-Type") || "";
 
-  // Content Security Policy
-  if (req.headers.get("accept")?.includes("text/html")) {
-    headers.set(
-      "Content-Security-Policy",
-      isDev
-        ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' ws: wss:;"
-        : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
-    );
-  }
-
-  // Security headers for all responses
+  // General security headers - apply to all responses
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("X-XSS-Protection", "1; mode=block");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
 
-  // HSTS for production
-  if (!isDev) {
-    headers.set(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
-    );
+  headers.delete("X-Powered-By");
+
+  // Content Security Policy - only for HTML responses
+  if (contentType.includes("text/html")) {
+    const isDev = process.env.NODE_ENV !== "production";
+    const cspDirectives = [
+      "default-src 'self'",
+      `script-src 'self' ${isDev ? "'unsafe-inline' 'unsafe-eval'" : ""}`,
+      `style-src 'self' ${isDev ? "'unsafe-inline'" : ""}`,
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ];
+    headers.set("Content-Security-Policy", cspDirectives.join("; "));
   }
 
-  // Attach headers to request
-  (req as any).securityHeaders = headers;
-  return null;
+  // HSTS - only in production
+  if (process.env.NODE_ENV === "production") {
+    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  // Cache control for API and static assets
+  if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/users") || url.pathname.startsWith("/api/admin")) {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    } else {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    }
+    headers.set("Pragma", "no-cache");
+    headers.set("Expires", "0");
+  } else if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  } else if (url.pathname === "/manifest.json") {
+    headers.set("Cache-Control", "public, max-age=3600");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 ```
 
@@ -275,61 +289,61 @@ Handles cross-origin requests:
 
 ```typescript
 // src/server/middleware/cors.ts
-interface CorsOptions {
-  origin?: string | string[] | ((origin: string) => boolean);
-  methods?: string[];
-  allowedHeaders?: string[];
-  exposedHeaders?: string[];
-  credentials?: boolean;
-  maxAge?: number;
+import { env } from "../../config/env";
+
+const PORT = env.PORT;
+const ALLOWED_ORIGINS =
+  env.NODE_ENV === "production"
+    ? ["https://yourdomain.com"]
+    : [
+        `http://localhost:${PORT}`,
+        `http://localhost:${Number(PORT) + 1}`,
+        `http://127.0.0.1:${PORT}`,
+      ];
+
+const ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+const ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token"];
+
+export function applyCorsHeaders(response: Response, origin: string | null): Response {
+  const headers = new Headers(response.headers);
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
+
+  headers.set("Vary", "Origin");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
-export function createCorsMiddleware(options: CorsOptions = {}) {
-  return function corsMiddleware(req: Request): Response | null {
-    const origin = req.headers.get("origin");
-    
-    // Handle preflight
-    if (req.method === "OPTIONS") {
-      const headers = new Headers();
-      
-      // Set allowed origin
-      if (options.origin === "*") {
-        headers.set("Access-Control-Allow-Origin", "*");
-      } else if (typeof options.origin === "function" && origin) {
-        if (options.origin(origin)) {
-          headers.set("Access-Control-Allow-Origin", origin);
-        }
-      } else if (Array.isArray(options.origin) && origin) {
-        if (options.origin.includes(origin)) {
-          headers.set("Access-Control-Allow-Origin", origin);
-        }
-      }
+export function handleCorsPreflightRequest(req: Request): Response | null {
+  if (req.method !== "OPTIONS") return null;
 
-      headers.set("Access-Control-Allow-Methods", 
-        (options.methods || ["GET", "POST", "PUT", "DELETE"]).join(", ")
-      );
-      headers.set("Access-Control-Allow-Headers",
-        (options.allowedHeaders || ["Content-Type", "Authorization"]).join(", ")
-      );
-      headers.set("Access-Control-Max-Age", String(options.maxAge || 86400));
+  const origin = req.headers.get("Origin");
+  const headers = new Headers();
 
-      if (options.credentials) {
-        headers.set("Access-Control-Allow-Credentials", "true");
-      }
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+  }
 
-      return new Response(null, { status: 204, headers });
-    }
+  headers.set("Access-Control-Allow-Methods", ALLOWED_METHODS.join(", "));
+  headers.set("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
+  headers.set("Access-Control-Max-Age", "86400");
+  headers.set("Vary", "Origin");
 
-    // Store CORS headers for actual request
-    (req as any).corsHeaders = createCorsHeaders(origin, options);
-    return null;
-  };
+  return new Response(null, { status: 204, headers });
 }
 ```
 
 ### Validation Middleware
 
-#### `validateBody`
+#### `validateRequest`
 
 Validates request body with Zod schema:
 
@@ -337,140 +351,33 @@ Validates request body with Zod schema:
 // src/server/middleware/validation.ts
 import { z } from "zod";
 
-export function validateBody<T>(schema: z.ZodSchema<T>) {
-  return async function validationMiddleware(req: Request): Promise<Response | null> {
-    try {
-      const body = await req.json();
-      const result = schema.safeParse(body);
-
-      if (!result.success) {
-        return Response.json(
-          {
-            error: "Validation failed",
-            details: result.error.flatten(),
-          },
-          { status: 400 }
-        );
-      }
-
-      // Attach validated data
-      (req as any).validatedBody = result.data;
-      return null;
-    } catch (error) {
-      return Response.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
-      );
+export async function validateRequest<T>(
+  req: Request,
+  schema: z.ZodSchema<T>
+): Promise<T | Response> {
+  try {
+    const body = await req.json();
+    return schema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json({ errors: error.errors }, { status: 400 });
     }
-  };
+    return new Response("Invalid request", { status: 400 });
+  }
 }
 
-// Usage
-const userSchema = z.object({
+// Usage in route handler
+const loginSchema = z.object({
   email: z.string().email(),
-  name: z.string().min(1),
-  age: z.number().int().positive(),
+  password: z.string().min(8),
 });
 
-export const users = {
-  "/": {
-    POST: [validateBody(userSchema), createUser],
-  },
-};
-```
+async function handleLogin(req: Request) {
+  const body = await validateRequest(req, loginSchema);
+  if (body instanceof Response) return body;
 
-#### `validateQuery`
-
-Validates query parameters:
-
-```typescript
-export function validateQuery<T>(schema: z.ZodSchema<T>) {
-  return function validationMiddleware(req: Request): Response | null {
-    const url = new URL(req.url);
-    const params = Object.fromEntries(url.searchParams);
-    
-    const result = schema.safeParse(params);
-    
-    if (!result.success) {
-      return Response.json(
-        {
-          error: "Invalid query parameters",
-          details: result.error.flatten(),
-        },
-        { status: 400 }
-      );
-    }
-
-    (req as any).validatedQuery = result.data;
-    return null;
-  };
-}
-
-// Usage
-const searchSchema = z.object({
-  q: z.string().optional(),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-});
-
-export const search = {
-  "/": {
-    GET: [validateQuery(searchSchema), handleSearch],
-  },
-};
-```
-
-### Logging Middleware
-
-#### `loggingMiddleware`
-
-Logs requests and responses:
-
-```typescript
-// src/server/middleware/logging.ts
-interface LogOptions {
-  includeBody?: boolean;
-  includeHeaders?: boolean;
-  skipPaths?: string[];
-}
-
-export function createLoggingMiddleware(options: LogOptions = {}) {
-  return function loggingMiddleware(req: Request): Response | null {
-    const start = Date.now();
-    const url = new URL(req.url);
-    
-    // Skip certain paths
-    if (options.skipPaths?.includes(url.pathname)) {
-      return null;
-    }
-
-    // Log request
-    const requestLog = {
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      path: url.pathname,
-      query: Object.fromEntries(url.searchParams),
-      ip: getClientIp(req),
-      userAgent: req.headers.get("user-agent"),
-    };
-
-    if (options.includeHeaders) {
-      requestLog.headers = Object.fromEntries(req.headers);
-    }
-
-    console.log("→ Request:", JSON.stringify(requestLog));
-
-    // Log response after completion
-    queueMicrotask(() => {
-      const duration = Date.now() - start;
-      console.log("← Response:", {
-        path: url.pathname,
-        duration: `${duration}ms`,
-      });
-    });
-
-    return null;
-  };
+  // body is now typed as { email: string; password: string }
+  // ... handle login
 }
 ```
 
@@ -552,16 +459,9 @@ export function compose(...middlewares: Middleware[]): Middleware {
 
 // Usage
 const protectedWithLogging = compose(
-  loggingMiddleware,
   requireAuth,
-  csrfMiddleware
+  applyCsrfProtection
 );
-
-export const secure = {
-  "/": {
-    POST: [protectedWithLogging, handleSecureAction],
-  },
-};
 ```
 
 ## Middleware Context

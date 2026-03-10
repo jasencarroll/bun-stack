@@ -88,40 +88,39 @@ const createProductSchema = z.object({
 });
 
 export const products = {
-  "/": {
-    GET: async () => {
-      const products = await productRepo.findAll();
-      return Response.json(products);
-    },
-    
-    POST: async (req: Request) => {
-      const body = await req.json();
-      const result = createProductSchema.safeParse(body);
-      
-      if (!result.success) {
-        return Response.json(
-          { error: "Invalid input", details: result.error },
-          { status: 400 }
-        );
-      }
-      
-      const product = await productRepo.create(result.data);
-      return Response.json(product, { status: 201 });
-    },
+  GET: async () => {
+    const products = await productRepo.findAll();
+    return Response.json(products);
+  },
+
+  POST: async (req: Request) => {
+    const body = await req.json();
+    const result = createProductSchema.safeParse(body);
+
+    if (!result.success) {
+      return Response.json(
+        { error: "Invalid input", details: result.error },
+        { status: 400 }
+      );
+    }
+
+    const product = await productRepo.create(result.data);
+    return Response.json(product, { status: 201 });
   },
 };
 ```
 
-2. Register in router:
+2. Register in `src/server/index.ts` by adding route handling in the `Bun.serve` fetch handler:
 
 ```typescript
-// src/server/router.ts
-import { products } from "./routes/products";
-
-const routes = {
-  // ... existing routes
-  "/api/products": products,
-};
+// In the Bun.serve fetch handler, add:
+if (path.startsWith("/api/products")) {
+  const handlers = routes.products;
+  if (req.method === "GET" && path === "/api/products") {
+    response = await handlers.GET(req);
+  }
+  // ... handle other methods and /:id routes
+}
 ```
 
 #### Testing Your Endpoint
@@ -316,23 +315,21 @@ Essential tabs for development:
 ### Adding Authentication to a Route
 
 ```typescript
-// Protect an endpoint
-import { requireAuth } from "../middleware/auth";
-
-export const protected = {
-  "/data": {
-    GET: [
-      requireAuth,
-      async (req: Request) => {
-        const user = (req as any).user;
-        return Response.json({ 
-          message: `Hello ${user.name}!`,
-          userId: user.id 
-        });
-      },
-    ],
+// src/server/routes/data.ts
+export const data = {
+  GET: async (req: Request) => {
+    const user = req.user!;
+    return Response.json({
+      message: `Hello ${user.name}!`,
+      userId: user.id
+    });
   },
 };
+
+// Auth is applied imperatively in src/server/index.ts:
+// const authCheck = requireAuth(req);
+// if (authCheck) { response = authCheck; }
+// else { response = await handlers.GET(req); }
 ```
 
 ### Working with Forms

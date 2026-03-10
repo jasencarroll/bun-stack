@@ -1,9 +1,8 @@
-import React from "react";
-import { Routes, Route } from "react-router-dom";
-import { LandingPage } from "./pages/LandingPage";
+import { Route, Routes } from "react-router-dom";
 import { DocsLayout } from "./components/docs/DocsLayout";
 import { DocsPage } from "./pages/DocsPage";
 import { DocViewerPage } from "./pages/DocViewerPage";
+import { LandingPage } from "./pages/LandingPage";
 
 export function App() {
   return (

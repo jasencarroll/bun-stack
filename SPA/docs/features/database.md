@@ -8,7 +8,7 @@ Key features:
 
 - 🗄️ **Dual Database Support** - SQLite (dev) and PostgreSQL (prod)
 - 🔧 **Drizzle ORM** - Type-safe SQL with excellent DX
-- 📊 **Automatic Migrations** - Schema versioning and rollbacks
+- 📊 **Schema Management** - Push-based schema updates and migration generation
 - 🏭 **Repository Pattern** - Clean data access layer
 - 🎯 **Type Safety** - Generated TypeScript types
 - 🚀 **Performance** - Optimized queries and connection pooling
@@ -21,31 +21,67 @@ The database client automatically detects which database to use:
 
 ```typescript
 // src/db/client.ts
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import { Database } from "bun:sqlite";
+import { drizzle as drizzleSqlite } from "drizzle-orm/bun-sqlite";
 import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { Database } from "bun:sqlite";
+import * as schema from "./schema";
 
-const DATABASE_URL = process.env.DATABASE_URL;
+let _db:
+  | ReturnType<typeof drizzlePg<typeof schema>>
+  | ReturnType<typeof drizzleSqlite<typeof schema>>
+  | undefined;
+let dbType: "postgres" | "sqlite" = "sqlite";
 
-// Automatically choose database based on DATABASE_URL
-export const db = DATABASE_URL?.startsWith("postgresql://")
-  ? drizzlePg(postgres(DATABASE_URL))
-  : drizzle(new Database("./app.db"));
+async function initializeDatabase() {
+  const pgUrl = process.env.DATABASE_URL;
+
+  if (pgUrl?.startsWith("postgres")) {
+    try {
+      const client = postgres(pgUrl, {
+        connect_timeout: 5,
+        max: 1,
+      });
+      await client`SELECT 1`;
+
+      const mainClient = postgres(pgUrl);
+      _db = drizzlePg(mainClient, { schema });
+      dbType = "postgres";
+      console.log("✅ Connected to PostgreSQL database");
+
+      await client.end();
+      return;
+    } catch (error) {
+      console.warn(
+        "⚠️  PostgreSQL connection failed, falling back to SQLite:",
+        (error as Error).message
+      );
+    }
+  }
+
+  // Fallback to SQLite
+  const sqliteDb = new Database(process.env.SQLITE_PATH || "./db/app.db");
+  _db = drizzleSqlite(sqliteDb, { schema });
+  dbType = "sqlite";
+  console.log("✅ Using SQLite database");
+}
+
+await initializeDatabase();
+
+export { dbType };
+
+// Export db with type assertion to make operations work with union types
+export const db = _db as any as ReturnType<typeof drizzleSqlite<typeof schema>>;
 ```
 
 ### Environment Variables
 
 ```bash
 # SQLite (default, no configuration needed)
-# Database created at ./app.db
+# Database created at ./db/app.db (override with SQLITE_PATH)
 
 # PostgreSQL (production)
 DATABASE_URL=postgresql://user:password@localhost:5432/myapp
-
-# Connection pool settings (PostgreSQL)
-DATABASE_POOL_SIZE=10
-DATABASE_IDLE_TIMEOUT=30000
 ```
 
 ## Schema Definition
@@ -56,32 +92,37 @@ Create your schema with both SQLite and PostgreSQL variants:
 
 ```typescript
 // src/db/schema.ts
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { pgTable, varchar, timestamp, decimal, boolean } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
-import { sql } from "drizzle-orm";
+import { pgTable, text as pgText, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // SQLite schema
-export const users = sqliteTable("users", {
+export const usersSqlite = sqliteTable("users", {
   id: text("id").primaryKey().$defaultFn(() => createId()),
-  email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  email: text("email").notNull().unique(),
   password: text("password"),
   role: text("role").default("user").notNull(),
-  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
-// PostgreSQL schema (same structure, different types)
+// PostgreSQL schema
 export const usersPg = pgTable("users", {
-  id: varchar("id", { length: 128 }).primaryKey().$defaultFn(() => createId()),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  password: varchar("password", { length: 255 }),
-  role: varchar("role", { length: 50 }).default("user").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: pgText("name").notNull(),
+  email: pgText("email").notNull().unique(),
+  password: pgText("password"),
+  role: pgText("role").default("user").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Export the appropriate schema based on runtime detection
+export const users = process.env.DATABASE_URL?.startsWith("postgres") ? usersPg : usersSqlite;
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 ```
 
 ### Relationships
@@ -142,12 +183,11 @@ export const posts = sqliteTable("posts", {
 For rapid development, use push:
 
 ```bash
-# Push schema changes directly to database
+# Push schema changes directly to database (SQLite)
 bun run db:push
 
-# This runs:
-# SQLite: bunx drizzle-kit push:sqlite
-# PostgreSQL: bunx drizzle-kit push:pg
+# Push schema changes (PostgreSQL)
+bun run db:push:pg
 ```
 
 ### Production Migrations
@@ -155,14 +195,18 @@ bun run db:push
 For production, generate and apply migrations:
 
 ```bash
-# Generate migration files
+# Generate migration files (SQLite)
 bun run db:generate
+
+# Generate migration files (PostgreSQL)
+bun run db:generate:pg
 
 # Review generated SQL
 cat drizzle/0001_initial_schema.sql
 
-# Apply migrations
-bun run db:migrate
+# Apply migrations (push schema to database)
+bun run db:push       # SQLite
+bun run db:push:pg    # PostgreSQL
 ```
 
 ### Migration Files
@@ -189,138 +233,99 @@ DROP INDEX IF EXISTS user_id_idx;
 
 ## Repository Pattern
 
-### Creating a Repository
+The generated template includes a `UserRepository` interface with separate `SQLiteUserRepository` and `PostgresUserRepository` implementations. The `db` instance is injected via constructor (dependency injection), not imported at module level.
+
+### Template Repository Structure
 
 ```typescript
-// src/db/repositories/post.repository.ts
-import { db } from "../client";
-import { posts, users, type InsertPost, type SelectPost } from "../schema";
-import { eq, desc, and, like } from "drizzle-orm";
+// src/db/repositories/UserRepository.ts (interface)
+export interface UserRepository {
+  findAll(): Promise<User[]>;
+  findById(id: string): Promise<User | undefined>;
+  create(data: NewUser): Promise<User>;
+  update(id: string, data: Partial<NewUser>): Promise<User | undefined>;
+  delete(id: string): Promise<boolean>;
+}
 
+// src/db/repositories/SQLiteUserRepository.ts
+export class SQLiteUserRepository implements UserRepository {
+  constructor(private db: ReturnType<typeof drizzleSqlite>) {}
+
+  async findAll() {
+    return this.db.select().from(usersSqlite);
+  }
+
+  async update(id: string, data: Partial<NewUser>) {
+    const [user] = await this.db
+      .update(usersSqlite)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(usersSqlite.id, id))
+      .returning();
+    return user;
+  }
+
+  async delete(id: string) {
+    const result = await this.db
+      .delete(usersSqlite)
+      .where(eq(usersSqlite.id, id))
+      .returning();
+    return result.length > 0;
+  }
+  // ...
+}
+
+// src/db/repositories/index.ts (factory)
+export const userRepository = dbType === "postgres"
+  ? new PostgresUserRepository(db)
+  : new SQLiteUserRepository(db);
+```
+
+### Creating Your Own Repository
+
+> **Note:** The `PostRepository` below is a recommended pattern for extending the template — it is not included in the generated code.
+
+```typescript
+// src/db/repositories/post.repository.ts (not in template — create as needed)
 export class PostRepository {
-  async findAll(options?: {
-    userId?: string;
-    published?: boolean;
-    limit?: number;
-    offset?: number;
-  }): Promise<SelectPost[]> {
-    const conditions = [];
-    
-    if (options?.userId) {
-      conditions.push(eq(posts.userId, options.userId));
-    }
-    
-    if (options?.published !== undefined) {
-      conditions.push(eq(posts.published, options.published));
-    }
-    
-    let query = db
-      .select()
-      .from(posts)
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(posts.createdAt));
-    
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
-    
-    if (options?.offset) {
-      query = query.offset(options.offset);
-    }
-    
-    return await query;
+  constructor(private db: ReturnType<typeof drizzleSqlite>) {}
+
+  async findAll(): Promise<SelectPost[]> {
+    return this.db.select().from(posts).orderBy(desc(posts.createdAt));
   }
-  
-  async findById(id: string): Promise<SelectPost | null> {
-    const [post] = await db
+
+  async findById(id: string): Promise<SelectPost | undefined> {
+    const [post] = await this.db
       .select()
       .from(posts)
       .where(eq(posts.id, id));
-    
-    return post || null;
+    return post;
   }
-  
-  async findWithAuthor(id: string) {
-    const [result] = await db
-      .select({
-        post: posts,
-        author: users,
-      })
-      .from(posts)
-      .innerJoin(users, eq(posts.userId, users.id))
-      .where(eq(posts.id, id));
-    
-    return result || null;
-  }
-  
-  async create(data: Omit<InsertPost, "id">): Promise<SelectPost> {
-    const [post] = await db
+
+  async create(data: NewPost): Promise<SelectPost> {
+    const [post] = await this.db
       .insert(posts)
       .values(data)
       .returning();
-    
     return post;
   }
-  
-  async update(
-    id: string, 
-    data: Partial<Omit<InsertPost, "id">>
-  ): Promise<SelectPost | null> {
-    const [post] = await db
+
+  async update(id: string, data: Partial<NewPost>): Promise<SelectPost | undefined> {
+    const [post] = await this.db
       .update(posts)
-      .set({
-        ...data,
-        updatedAt: new Date().toISOString(),
-      })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(posts.id, id))
       .returning();
-    
-    return post || null;
+    return post;
   }
-  
+
   async delete(id: string): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .delete(posts)
-      .where(eq(posts.id, id));
-    
-    return result.changes > 0;
-  }
-  
-  async search(query: string): Promise<SelectPost[]> {
-    return await db
-      .select()
-      .from(posts)
-      .where(like(posts.title, `%${query}%`))
-      .orderBy(desc(posts.createdAt));
+      .where(eq(posts.id, id))
+      .returning();
+    return result.length > 0;
   }
 }
-
-export const postRepository = new PostRepository();
-```
-
-### Using Repositories
-
-```typescript
-// In your route handlers
-import { postRepository } from "@/db/repositories/post.repository";
-
-export const posts = {
-  "/": {
-    GET: async (req: Request) => {
-      const url = new URL(req.url);
-      const userId = url.searchParams.get("userId");
-      const published = url.searchParams.get("published");
-      
-      const posts = await postRepository.findAll({
-        userId: userId || undefined,
-        published: published === "true",
-        limit: 20,
-      });
-      
-      return Response.json(posts);
-    },
-  },
-};
 ```
 
 ## Querying Data
@@ -474,49 +479,47 @@ await db.transaction(async (tx) => {
 
 ```typescript
 // src/db/seed.ts
-import { db } from "./client";
-import { users, posts, tags } from "./schema";
-import { faker } from "@faker-js/faker";
+import { dbType } from "./client";
+import { userRepository } from "./repositories";
 
-async function seed() {
-  console.log("🌱 Seeding database...");
-  
-  // Clear existing data
-  await db.delete(posts);
-  await db.delete(users);
-  
-  // Create users
-  const userIds = [];
-  for (let i = 0; i < 10; i++) {
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: faker.internet.email(),
-        name: faker.person.fullName(),
-        password: await Bun.password.hash("password123"),
-        role: i === 0 ? "admin" : "user",
-      })
-      .returning();
-    
-    userIds.push(user.id);
-  }
-  
-  // Create posts
-  for (const userId of userIds) {
-    for (let i = 0; i < 5; i++) {
-      await db.insert(posts).values({
-        userId,
-        title: faker.lorem.sentence(),
-        content: faker.lorem.paragraphs(3),
-        published: faker.datatype.boolean(),
-      });
-    }
-  }
-  
-  console.log("✅ Seeding complete!");
+// Prevent seeding in production
+if (process.env.NODE_ENV === "production") {
+  console.error("❌ Seeding is disabled in production.");
+  process.exit(1);
 }
 
-// Run seed
+async function seed() {
+  console.log(`🌱 Seeding ${dbType} database...`);
+
+  // These credentials are for local development only
+  const users = [
+    {
+      name: "Alice Johnson",
+      email: "alice@example.com",
+      password: await Bun.password.hash("Dev-Password-123!"),
+      role: "admin" as const,
+    },
+    {
+      name: "Bob Williams",
+      email: "bob@example.com",
+      password: await Bun.password.hash("Dev-Password-123!"),
+      role: "user" as const,
+    },
+    {
+      name: "Charlie Brown",
+      email: "charlie@example.com",
+      password: await Bun.password.hash("Dev-Password-123!"),
+      role: "user" as const,
+    },
+  ];
+
+  for (const user of users) {
+    await userRepository.create(user);
+  }
+
+  console.log("✅ Database seeded!");
+}
+
 seed().catch(console.error);
 ```
 

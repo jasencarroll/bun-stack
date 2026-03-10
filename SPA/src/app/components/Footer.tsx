@@ -1,5 +1,3 @@
-import React from "react";
-
 export function Footer() {
   return (
     <footer className="border-t border-gray-800 py-12 px-4">
@@ -13,7 +11,8 @@ export function Footer() {
             </p>
             <div className="mt-4 space-y-2">
               <p className="text-sm text-gray-400">
-                Created by an engineer combining AI insights, business strategy, and full-stack expertise.
+                Created by an engineer combining AI insights, business strategy, and full-stack
+                expertise.
               </p>
             </div>
           </div>
@@ -116,7 +115,7 @@ export function Footer() {
             <p>Built with ❤️ by Jasen Carroll with Claude Code</p>
             <p className="mt-2">MIT License © {new Date().getFullYear()}</p>
           </div>
-          
+
           <div className="flex flex-wrap justify-center gap-4 text-sm">
             <a
               href="https://github.com/jasencarroll/create-bun-stack"

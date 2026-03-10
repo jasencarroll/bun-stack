@@ -6,3 +6,4 @@ dist
 public/main.js
 public/styles.css
 .hmr-timestamp
+.claude

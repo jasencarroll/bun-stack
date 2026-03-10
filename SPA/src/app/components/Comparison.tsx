@@ -1,4 +1,3 @@
-import React from "react";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 
 const comparisons = [

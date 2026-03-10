@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { EnvelopeIcon, UserIcon, ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
+import { ChatBubbleLeftRightIcon, EnvelopeIcon, UserIcon } from "@heroicons/react/24/outline";
+import type React from "react";
+import { useState } from "react";
 
 export function ContactForm() {
   const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ export function ContactForm() {
       } else {
         setStatus("error");
       }
-    } catch (error) {
+    } catch (_error) {
       setStatus("error");
     }
   };
@@ -51,7 +52,7 @@ export function ContactForm() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-effect rounded-xl p-8 space-y-6">          
+        <form onSubmit={handleSubmit} className="glass-effect rounded-xl p-8 space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
               Name

@@ -126,7 +126,6 @@ Create `src/server/routes/todos.ts`:
 
 ```typescript
 import { todoRepository } from "@/db/repositories/todo.repository";
-import { requireAuth } from "../middleware/auth";
 import { z } from "zod";
 
 const createTodoSchema = z.object({
@@ -141,104 +140,95 @@ const updateTodoSchema = z.object({
 });
 
 export const todos = {
-  "/": {
-    GET: [
-      requireAuth,
-      async (req: Request) => {
-        const user = (req as any).user;
-        const todos = await todoRepository.findAllByUserId(user.id);
-        return Response.json(todos);
-      },
-    ],
-    POST: [
-      requireAuth,
-      async (req: Request) => {
-        const user = (req as any).user;
-        const body = await req.json();
-        
-        const result = createTodoSchema.safeParse(body);
-        if (!result.success) {
-          return Response.json(
-            { error: "Invalid input", details: result.error.errors },
-            { status: 400 }
-          );
-        }
+  GET: async (req: Request) => {
+    const user = req.user!;
+    const todos = await todoRepository.findAllByUserId(user.id);
+    return Response.json(todos);
+  },
+  POST: async (req: Request) => {
+    const user = req.user!;
+    const body = await req.json();
 
-        const todo = await todoRepository.create({
-          ...result.data,
-          userId: user.id,
-        });
+    const result = createTodoSchema.safeParse(body);
+    if (!result.success) {
+      return Response.json(
+        { error: "Invalid input", details: result.error.errors },
+        { status: 400 }
+      );
+    }
 
-        return Response.json(todo, { status: 201 });
-      },
-    ],
+    const todo = await todoRepository.create({
+      ...result.data,
+      userId: user.id,
+    });
+
+    return Response.json(todo, { status: 201 });
   },
   "/:id": {
-    GET: [
-      requireAuth,
-      async (req: Request, { params }: { params: { id: string } }) => {
-        const user = (req as any).user;
-        const todo = await todoRepository.findById(params.id, user.id);
-        
-        if (!todo) {
-          return Response.json({ error: "Todo not found" }, { status: 404 });
-        }
+    GET: async (req: Request & { params: { id: string } }) => {
+      const user = req.user!;
+      const todo = await todoRepository.findById(req.params.id, user.id);
 
-        return Response.json(todo);
-      },
-    ],
-    PUT: [
-      requireAuth,
-      async (req: Request, { params }: { params: { id: string } }) => {
-        const user = (req as any).user;
-        const body = await req.json();
-        
-        const result = updateTodoSchema.safeParse(body);
-        if (!result.success) {
-          return Response.json(
-            { error: "Invalid input", details: result.error.errors },
-            { status: 400 }
-          );
-        }
+      if (!todo) {
+        return Response.json({ error: "Todo not found" }, { status: 404 });
+      }
 
-        const todo = await todoRepository.update(params.id, user.id, result.data);
-        
-        if (!todo) {
-          return Response.json({ error: "Todo not found" }, { status: 404 });
-        }
+      return Response.json(todo);
+    },
+    PUT: async (req: Request & { params: { id: string } }) => {
+      const user = req.user!;
+      const body = await req.json();
 
-        return Response.json(todo);
-      },
-    ],
-    DELETE: [
-      requireAuth,
-      async (req: Request, { params }: { params: { id: string } }) => {
-        const user = (req as any).user;
-        const deleted = await todoRepository.delete(params.id, user.id);
-        
-        if (!deleted) {
-          return Response.json({ error: "Todo not found" }, { status: 404 });
-        }
+      const result = updateTodoSchema.safeParse(body);
+      if (!result.success) {
+        return Response.json(
+          { error: "Invalid input", details: result.error.errors },
+          { status: 400 }
+        );
+      }
 
-        return new Response(null, { status: 204 });
-      },
-    ],
+      const todo = await todoRepository.update(req.params.id, user.id, result.data);
+
+      if (!todo) {
+        return Response.json({ error: "Todo not found" }, { status: 404 });
+      }
+
+      return Response.json(todo);
+    },
+    DELETE: async (req: Request & { params: { id: string } }) => {
+      const user = req.user!;
+      const deleted = await todoRepository.delete(req.params.id, user.id);
+
+      if (!deleted) {
+        return Response.json({ error: "Todo not found" }, { status: 404 });
+      }
+
+      return new Response(null, { status: 204 });
+    },
   },
 };
 ```
 
 ### 3.2 Register Routes
 
-Update `src/server/router.ts` to include the todo routes:
+Add routing for your todo API in `src/server/index.ts` alongside the existing route handling:
 
 ```typescript
-import { todos } from "./routes/todos";
-
-// Add to the routes object
-const routes = {
-  // ... existing routes
-  "/api/todos": todos,
-};
+// In the Bun.serve fetch handler, add:
+if (path.startsWith("/api/todos")) {
+  const handlers = routes.todos;
+  if (req.method === "GET" && path === "/api/todos") {
+    const authCheck = requireAuth(req);
+    if (authCheck) { response = authCheck; }
+    else { response = await handlers.GET(req); }
+  }
+  if (req.method === "POST" && path === "/api/todos") {
+    const authCheck = requireAuth(req);
+    if (authCheck) { response = authCheck; }
+    else { response = await handlers.POST(req); }
+  }
+  // ... handle /:id routes with Object.assign(req, { params: { id } })
+}
 ```
 
 ## Step 4: Create the Frontend
@@ -429,9 +419,9 @@ import { useAuth } from "@/app/hooks/useAuth";
 import { TodoList } from "@/app/components/TodoList";
 
 export function TodosPage() {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return <div className="text-center py-8">Loading...</div>;
   }
 

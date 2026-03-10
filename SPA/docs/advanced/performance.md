@@ -39,7 +39,9 @@ Bun.serve({
     return new Response("Internal Server Error", { status: 500 });
   },
   
-  fetch: router.fetch,
+  fetch(req) {
+    // Route handling logic from src/server/index.ts
+  },
 });
 ```
 

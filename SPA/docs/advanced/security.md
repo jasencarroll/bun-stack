@@ -20,58 +20,24 @@ Create Bun Stack includes several security features by default:
 Always use Bun's built-in password hashing:
 
 ```typescript
-// src/server/auth/password.ts
-export class PasswordManager {
-  // Hash passwords with Bun's secure implementation
-  async hash(password: string): Promise<string> {
-    return Bun.password.hash(password, {
-      algorithm: "argon2id", // Most secure algorithm
-      memoryCost: 65536,     // 64MB
-      timeCost: 3,          // 3 iterations
-    });
+// src/lib/crypto.ts
+export async function hashPassword(password: string): Promise<string> {
+  if (!password || password.length === 0) {
+    throw new Error("Password cannot be empty");
   }
-  
-  // Verify passwords
-  async verify(password: string, hash: string): Promise<boolean> {
-    return Bun.password.verify(password, hash);
-  }
-  
-  // Password strength validation
-  validateStrength(password: string): {
-    valid: boolean;
-    errors: string[];
-  } {
-    const errors: string[] = [];
-    
-    if (password.length < 12) {
-      errors.push("Password must be at least 12 characters");
-    }
-    
-    if (!/[A-Z]/.test(password)) {
-      errors.push("Password must contain uppercase letters");
-    }
-    
-    if (!/[a-z]/.test(password)) {
-      errors.push("Password must contain lowercase letters");
-    }
-    
-    if (!/[0-9]/.test(password)) {
-      errors.push("Password must contain numbers");
-    }
-    
-    if (!/[^A-Za-z0-9]/.test(password)) {
-      errors.push("Password must contain special characters");
-    }
-    
-    // Check against common passwords
-    if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
-      errors.push("Password is too common");
-    }
-    
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
+  // Bun uses bcrypt by default
+  return await Bun.password.hash(password);
+}
+
+export async function verifyPassword(
+  password: string,
+  hashedPassword: string
+): Promise<boolean> {
+  if (!hashedPassword) return false;
+  try {
+    return await Bun.password.verify(password, hashedPassword);
+  } catch {
+    return false;
   }
 }
 ```
@@ -81,74 +47,55 @@ export class PasswordManager {
 Implement secure JWT handling:
 
 ```typescript
-// src/server/auth/jwt.ts
-import jwt from "jsonwebtoken";
+// src/lib/crypto.ts
+import { createHmac } from "node:crypto";
+import { env } from "../config/env";
 
-export class JWTManager {
-  private secret = process.env.JWT_SECRET!;
-  private issuer = "create-bun-stack";
-  
-  constructor() {
-    // Validate secret strength
-    if (this.secret.length < 32) {
-      throw new Error("JWT_SECRET must be at least 32 characters");
-    }
-  }
-  
-  // Generate secure tokens
-  generateToken(payload: any, options?: jwt.SignOptions): string {
-    return jwt.sign(payload, this.secret, {
-      expiresIn: "24h",
-      issuer: this.issuer,
-      algorithm: "HS256",
-      ...options,
-    });
-  }
-  
-  // Generate refresh tokens with longer expiry
-  generateRefreshToken(userId: string): string {
-    return jwt.sign(
-      { userId, type: "refresh" },
-      this.secret,
-      {
-        expiresIn: "30d",
-        issuer: this.issuer,
-        algorithm: "HS256",
-      }
-    );
-  }
-  
-  // Verify tokens with security checks
-  verifyToken(token: string): any {
-    try {
-      const decoded = jwt.verify(token, this.secret, {
-        issuer: this.issuer,
-        algorithms: ["HS256"],
-      });
-      
-      // Additional security checks
-      if (typeof decoded === "string") {
-        throw new Error("Invalid token format");
-      }
-      
-      return decoded;
-    } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        throw new Error("Token expired");
-      }
-      throw new Error("Invalid token");
-    }
-  }
-  
-  // Revoke tokens (requires token blacklist)
-  async revokeToken(token: string) {
-    const decoded = this.verifyToken(token);
-    await this.blacklist.add(token, decoded.exp);
+const JWT_EXPIRY = 60 * 60 * 24; // 24 hours in seconds
+
+export function generateToken(payload: Record<string, unknown>): string {
+  const header = { alg: "HS256", typ: "JWT" };
+
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
+  const encodedPayload = Buffer.from(
+    JSON.stringify({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + JWT_EXPIRY,
+    })
+  ).toString("base64url");
+
+  const signature = createHmac("sha256", env.JWT_SECRET)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+export function verifyToken(token: string): Record<string, unknown> | null {
+  try {
+    const [encodedHeader, encodedPayload, signature] = token.split(".");
+    if (!encodedHeader || !encodedPayload || !signature) return null;
+
+    const testSignature = createHmac("sha256", env.JWT_SECRET)
+      .update(`${encodedHeader}.${encodedPayload}`)
+      .digest("base64url");
+
+    if (signature !== testSignature) return null;
+
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch {
+    return null;
   }
 }
 ```
 
 ### Session Security
+
+> **Note:** The examples below show recommended patterns for production hardening. These implementations are not included in the generated template.
 
 Implement secure session management:
 
@@ -233,6 +180,8 @@ export class SessionManager {
 
 ### Role-Based Access Control (RBAC)
 
+> **Note:** The examples below show recommended patterns for production hardening. These implementations are not included in the generated template.
+
 Implement fine-grained permissions:
 
 ```typescript
@@ -316,10 +265,12 @@ export class RBAC {
 
 ### Resource-Based Access Control
 
+> **Note:** The resource access control below is a recommended pattern for production hardening. It is not included in the generated template — create it as needed.
+
 Implement ownership checks:
 
 ```typescript
-// src/server/auth/resource-access.ts
+// src/server/auth/resource-access.ts (not in template — create as needed)
 export class ResourceAccess {
   // Check resource ownership
   async canAccessResource(
@@ -390,70 +341,53 @@ export class ResourceAccess {
 
 ### Request Validation
 
-Validate all input data:
+The template includes a `validateRequest` utility and defines schemas inline in route handlers:
 
 ```typescript
-// src/server/validation/schemas.ts
+// src/server/middleware/validation.ts
 import { z } from "zod";
 
-// User registration schema
-export const registerSchema = z.object({
-  email: z
-    .string()
-    .email("Invalid email format")
-    .toLowerCase()
-    .max(255),
-  password: z
-    .string()
-    .min(12, "Password must be at least 12 characters")
-    .max(128)
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
-      "Password must contain uppercase, lowercase, number, and special character"
-    ),
-  name: z
-    .string()
-    .min(2)
-    .max(100)
-    .regex(/^[a-zA-Z\s'-]+$/, "Name contains invalid characters"),
+export async function validateRequest<T>(
+  req: Request,
+  schema: z.ZodSchema<T>
+): Promise<T | Response> {
+  try {
+    const body = await req.json();
+    return schema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json({ errors: error.errors }, { status: 400 });
+    }
+    return new Response("Invalid request", { status: 400 });
+  }
+}
+
+// Usage in route handler (src/server/routes/auth.ts):
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
 });
 
-// Sanitize user input
-export const sanitizeInput = (input: string): string => {
-  return input
-    .trim()
-    .replace(/[<>]/g, "") // Remove potential HTML tags
-    .slice(0, 1000); // Limit length
-};
+const body = await validateRequest(req, loginSchema);
+if (body instanceof Response) return body;
+// body is now typed as { email: string; password: string }
+```
 
-// Validate and sanitize middleware
-export function validateRequest(schema: z.ZodSchema) {
-  return async (req: Request) => {
-    try {
-      const body = await req.json();
-      const validated = schema.parse(body);
-      
-      // Attach validated data to request
-      req.validatedBody = validated;
-      return null;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return Response.json(
-          {
-            error: "Validation failed",
-            details: error.errors,
-          },
-          { status: 400 }
-        );
-      }
-      
-      return Response.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
-    }
-  };
-}
+> **Note:** The `registerSchema`, `sanitizeInput`, and stronger password validation schemas below are recommended patterns for production hardening — they are not included in the generated template.
+
+```typescript
+// Recommended: stricter schemas for production (not in template)
+export const registerSchema = z.object({
+  email: z.string().email().toLowerCase().max(255),
+  password: z.string().min(12).max(128)
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+      "Password must contain uppercase, lowercase, number, and special character"),
+  name: z.string().min(2).max(100),
+});
+
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, "").slice(0, 1000);
+};
 ```
 
 ### SQL Injection Prevention
@@ -461,7 +395,6 @@ export function validateRequest(schema: z.ZodSchema) {
 Use parameterized queries:
 
 ```typescript
-// src/db/security.ts
 // NEVER do this - vulnerable to SQL injection
 async function unsafeQuery(userInput: string) {
   return db.execute(`SELECT * FROM users WHERE name = '${userInput}'`);
@@ -495,119 +428,125 @@ function validateTableName(tableName: string): boolean {
 Implement double-submit cookie pattern:
 
 ```typescript
-// src/server/security/csrf.ts
-export class CSRFProtection {
-  generateToken(): string {
-    return crypto.randomUUID();
+// src/server/middleware/csrf.ts
+import { randomBytes } from "node:crypto";
+
+// WARNING: In-memory CSRF store. Tokens are lost on server restart and not shared
+// across instances. For production multi-instance deployments, replace with Redis
+// or database-backed storage.
+const csrfTokenStore = new Map<string, { token: string; expires: number }>();
+
+export function generateCsrfToken(): { token: string; cookie: string } {
+  const token = randomBytes(32).toString("hex");
+  const cookie = randomBytes(32).toString("hex");
+
+  csrfTokenStore.set(cookie, {
+    token,
+    expires: Date.now() + 24 * 60 * 60 * 1000,
+  });
+
+  cleanupExpiredTokens();
+  return { token, cookie };
+}
+
+export function validateCsrfToken(cookie: string | null, token: string | null): boolean {
+  if (!cookie || !token) return false;
+  const stored = csrfTokenStore.get(cookie);
+  if (!stored) return false;
+  if (stored.expires < Date.now()) {
+    csrfTokenStore.delete(cookie);
+    return false;
   }
-  
-  async createCSRFToken(sessionId: string): Promise<{
-    token: string;
-    hashedToken: string;
-  }> {
-    const token = this.generateToken();
-    const hashedToken = await Bun.password.hash(token + sessionId);
-    
-    return { token, hashedToken };
+  return stored.token === token;
+}
+
+export function applyCsrfProtection(req: Request): Response | null {
+  if (!requiresCsrfProtection(req)) return null;
+
+  const cookies = parseCookies(req.headers.get("Cookie") || "");
+  const csrfCookie = cookies["csrf-token"] || null;
+  const csrfToken = req.headers.get("X-CSRF-Token");
+
+  if (!validateCsrfToken(csrfCookie, csrfToken)) {
+    return Response.json({ error: "CSRF token validation failed" }, { status: 403 });
   }
-  
-  async validateCSRFToken(
-    token: string,
-    hashedToken: string,
-    sessionId: string
-  ): Promise<boolean> {
-    if (!token || !hashedToken) {
-      return false;
-    }
-    
-    return Bun.password.verify(token + sessionId, hashedToken);
-  }
-  
-  middleware() {
-    return async (req: Request) => {
-      // Skip CSRF for safe methods
-      if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-        return null;
-      }
-      
-      const token = req.headers.get("X-CSRF-Token");
-      const cookies = parseCookies(req.headers.get("Cookie") || "");
-      const hashedToken = cookies.csrf;
-      const sessionId = cookies.session;
-      
-      if (!token || !hashedToken || !sessionId) {
-        return Response.json(
-          { error: "CSRF token missing" },
-          { status: 403 }
-        );
-      }
-      
-      const isValid = await this.validateCSRFToken(
-        token,
-        hashedToken,
-        sessionId
-      );
-      
-      if (!isValid) {
-        return Response.json(
-          { error: "Invalid CSRF token" },
-          { status: 403 }
-        );
-      }
-      
-      return null;
-    };
-  }
+
+  return null;
+}
+
+// Helper: determines which requests need CSRF protection
+function requiresCsrfProtection(req: Request): boolean {
+  const url = new URL(req.url);
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return false;
+  if (url.pathname === "/api/auth/login" || url.pathname === "/api/auth/register") return false;
+  if (url.pathname === "/api/health") return false;
+  return true;
 }
 ```
 
 ## Security Headers
 
-### Implement Security Headers
+### Security Headers Implementation
 
-Add comprehensive security headers:
+Security headers are applied as a response processor (not middleware):
 
 ```typescript
-// src/server/security/headers.ts
-export function securityHeaders(
-  handler: (req: Request) => Promise<Response> | Response
-) {
-  return async (req: Request): Promise<Response> => {
-    const response = await handler(req);
-    
-    // Content Security Policy
-    response.headers.set(
-      "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Tighten in production
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "font-src 'self' data:",
-        "connect-src 'self' wss:",
-        "frame-ancestors 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-      ].join("; ")
-    );
-    
-    // Other security headers
-    response.headers.set("X-Content-Type-Options", "nosniff");
-    response.headers.set("X-Frame-Options", "DENY");
-    response.headers.set("X-XSS-Protection", "1; mode=block");
-    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    response.headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-    
-    // HSTS for production
-    if (process.env.NODE_ENV === "production") {
-      response.headers.set(
-        "Strict-Transport-Security",
-        "max-age=31536000; includeSubDomains; preload"
-      );
+// src/server/middleware/security-headers.ts
+export function applySecurityHeaders(response: Response, req: Request): Response {
+  const headers = new Headers(response.headers);
+  const url = new URL(req.url);
+  const contentType = response.headers.get("Content-Type") || "";
+
+  // General security headers
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("X-XSS-Protection", "1; mode=block");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  headers.delete("X-Powered-By");
+
+  // Content Security Policy - only for HTML responses
+  if (contentType.includes("text/html")) {
+    const isDev = process.env.NODE_ENV !== "production";
+    const cspDirectives = [
+      "default-src 'self'",
+      `script-src 'self' ${isDev ? "'unsafe-inline' 'unsafe-eval'" : ""}`,
+      `style-src 'self' ${isDev ? "'unsafe-inline'" : ""}`,
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ];
+    headers.set("Content-Security-Policy", cspDirectives.join("; "));
+  }
+
+  // HSTS - only in production
+  if (process.env.NODE_ENV === "production") {
+    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
+
+  // Cache control
+  if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/users") || url.pathname.startsWith("/api/admin")) {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    } else {
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     }
-    
-    return response;
-  };
+    headers.set("Pragma", "no-cache");
+    headers.set("Expires", "0");
+  } else if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  } else if (url.pathname === "/manifest.json") {
+    headers.set("Cache-Control", "public, max-age=3600");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 ```
 
@@ -618,105 +557,78 @@ export function securityHeaders(
 Protect against brute force and DoS:
 
 ```typescript
-// src/server/security/rate-limit.ts
-export class RateLimiter {
-  private attempts = new Map<string, number[]>();
-  
-  constructor(
-    private windowMs: number = 15 * 60 * 1000, // 15 minutes
-    private maxAttempts: number = 100
-  ) {}
-  
-  // Get client identifier
-  private getClientId(req: Request): string {
-    // Use IP address or user ID
-    const forwarded = req.headers.get("X-Forwarded-For");
-    const ip = forwarded?.split(",")[0] || "unknown";
-    const userId = req.user?.id;
-    
-    return userId || ip;
-  }
-  
-  // Check rate limit
-  async checkLimit(req: Request, multiplier: number = 1): Promise<boolean> {
-    const clientId = this.getClientId(req);
-    const now = Date.now();
-    
-    // Get attempts for this client
-    let clientAttempts = this.attempts.get(clientId) || [];
-    
-    // Remove old attempts
-    clientAttempts = clientAttempts.filter(
-      time => now - time < this.windowMs
-    );
-    
-    // Check limit
-    if (clientAttempts.length >= this.maxAttempts * multiplier) {
-      return false;
-    }
-    
-    // Add new attempt
-    clientAttempts.push(now);
-    this.attempts.set(clientId, clientAttempts);
-    
-    // Cleanup old entries periodically
-    if (Math.random() < 0.01) {
-      this.cleanup();
-    }
-    
-    return true;
-  }
-  
-  // Cleanup old entries
-  private cleanup() {
-    const now = Date.now();
-    
-    for (const [clientId, attempts] of this.attempts) {
-      const validAttempts = attempts.filter(
-        time => now - time < this.windowMs
-      );
-      
-      if (validAttempts.length === 0) {
-        this.attempts.delete(clientId);
-      } else {
-        this.attempts.set(clientId, validAttempts);
-      }
-    }
-  }
-  
-  // Middleware
-  middleware(options?: { maxAttempts?: number; windowMs?: number }) {
-    const limiter = new RateLimiter(
-      options?.windowMs || this.windowMs,
-      options?.maxAttempts || this.maxAttempts
-    );
-    
-    return async (req: Request) => {
-      const allowed = await limiter.checkLimit(req);
-      
-      if (!allowed) {
-        return Response.json(
-          { error: "Too many requests" },
-          {
-            status: 429,
-            headers: {
-              "Retry-After": String(Math.ceil(this.windowMs / 1000)),
-            },
-          }
-        );
-      }
-      
-      return null;
-    };
-  }
+// src/server/middleware/rate-limit.ts
+interface RateLimitOptions {
+  windowMs?: number; // Window size in milliseconds (default: 15 minutes)
+  max?: number;      // Max requests per window (default: 5)
+  message?: string;  // Error message
 }
 
-// Specific rate limiters
-export const loginRateLimiter = new RateLimiter(15 * 60 * 1000, 5); // 5 attempts per 15 min
-export const apiRateLimiter = new RateLimiter(15 * 60 * 1000, 100); // 100 requests per 15 min
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+export function createRateLimiter(options: RateLimitOptions = {}) {
+  const {
+    windowMs = 15 * 60 * 1000,
+    max = 5,
+    message = "Too many requests, please try again later",
+  } = options;
+
+  return (req: Request): Response | null => {
+    if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
+      return null;
+    }
+
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
+    const now = Date.now();
+    const resetTime = now + windowMs;
+
+    let entry = rateLimitStore.get(ip);
+
+    if (!entry || entry.resetTime < now) {
+      entry = { count: 1, resetTime };
+      rateLimitStore.set(ip, entry);
+      return null;
+    }
+
+    entry.count++;
+
+    if (entry.count > max) {
+      const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
+      return new Response(JSON.stringify({ error: message }), {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(max),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(entry.resetTime),
+        },
+      });
+    }
+
+    return null;
+  };
+}
+
+// Pre-configured rate limiters
+export const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many authentication attempts, please try again later",
+});
+
+export const strictAuthRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: "Too many failed login attempts, please try again later",
+});
 ```
 
 ## Data Encryption
+
+> **Note:** The examples below show recommended patterns for production hardening. These implementations are not included in the generated template.
 
 ### Encrypt Sensitive Data
 
@@ -802,6 +714,8 @@ export const encryptedField = customType<{
 ## Security Monitoring
 
 ### Audit Logging
+
+> **Note:** The examples below show recommended patterns for production hardening. These implementations are not included in the generated template.
 
 Log security events:
 

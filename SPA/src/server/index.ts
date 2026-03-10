@@ -1,5 +1,5 @@
+import { join } from "node:path";
 import { serve } from "bun";
-import { join } from "path";
 import { Resend } from "resend";
 import { docs } from "./routes/docs";
 
@@ -25,8 +25,8 @@ async function router(req: Request): Promise<Response> {
     if (pathname === "/api/hmr-check") {
       try {
         const timestamp = await Bun.file(hmrFile).text();
-        return Response.json({ time: parseInt(timestamp) });
-      } catch (e) {
+        return Response.json({ time: parseInt(timestamp, 10) });
+      } catch (_e) {
         return Response.json({ time: Date.now() });
       }
     }
@@ -34,42 +34,46 @@ async function router(req: Request): Promise<Response> {
     // Documentation routes
     if (pathname.startsWith("/api/docs")) {
       const docsPath = pathname.replace("/api/docs", "");
-      
+
       // Match the path to the appropriate handler
       if (docsPath === "" || docsPath === "/") {
-        const handler = docs["/"][req.method as keyof typeof docs["/"]];
+        const handler = docs["/"][req.method as keyof (typeof docs)["/"]];
         if (handler) {
           return handler(req);
         }
       } else if (docsPath === "/search") {
-        const handler = docs["/search"][req.method as keyof typeof docs["/search"]];
+        const handler = docs["/search"][req.method as keyof (typeof docs)["/search"]];
         if (handler) {
           return handler(req);
         }
       } else {
         // Handle wildcard routes
-        const handler = docs["/*"][req.method as keyof typeof docs["/*"]];
+        const handler = docs["/*"][req.method as keyof (typeof docs)["/*"]];
         if (handler) {
           return handler(req);
         }
       }
-      
+
       return new Response("Method Not Allowed", { status: 405 });
     }
 
     if (pathname === "/api/contact" && req.method === "POST") {
       try {
         // Get client IP for rate limiting
-        const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-        
+        const clientIp =
+          req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+
         // Check rate limit
         const now = Date.now();
         const userLimit = rateLimitMap.get(clientIp);
-        
+
         if (userLimit) {
           if (now < userLimit.resetTime) {
             if (userLimit.count >= RATE_LIMIT_MAX) {
-              return Response.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+              return Response.json(
+                { error: "Too many requests. Please try again later." },
+                { status: 429 }
+              );
             }
             userLimit.count++;
           } else {
@@ -100,16 +104,15 @@ async function router(req: Request): Promise<Response> {
         }
 
         // Sanitize inputs (basic - remove any potential HTML/script tags)
-        const sanitize = (str: string) => str.replace(/<[^>]*>/g, '').trim();
+        const sanitize = (str: string) => str.replace(/<[^>]*>/g, "").trim();
         data.name = sanitize(data.name);
         data.email = sanitize(data.email);
         data.message = sanitize(data.message);
 
-
         // Send email if Resend is configured
         if (resend && process.env.CONTACT_EMAIL_TO) {
           try {
-            const emailData = await resend.emails.send({
+            const _emailData = await resend.emails.send({
               from: process.env.CONTACT_EMAIL_FROM || "Bun Stack <onboarding@resend.dev>",
               to: [process.env.CONTACT_EMAIL_TO],
               subject: `New Bun Stack Contact Submission from ${data.name}`,
@@ -142,8 +145,7 @@ ${data.message}
 This email was sent from the Bun Stack contact form.
               `,
             });
-
-          } catch (emailError) {
+          } catch (_emailError) {
             // Don't fail the request if email fails, user experience is more important
           }
         }
@@ -155,13 +157,15 @@ This email was sent from the Bun Stack contact form.
       } catch (error) {
         // Log error internally but don't expose details to client
         console.error("Contact form error:", error);
-        return Response.json({ error: "An error occurred. Please try again later." }, { status: 500 });
+        return Response.json(
+          { error: "An error occurred. Please try again later." },
+          { status: 500 }
+        );
       }
     }
 
     return new Response("Not Found", { status: 404 });
   }
-
 
   // Serve static files
   try {
@@ -197,7 +201,14 @@ This email was sent from the Bun Stack contact form.
         if (pathname.includes("/main.js") || pathname.includes("/styles.css")) {
           // Long cache for built assets (assuming they have hashes in production)
           headers["Cache-Control"] = "public, max-age=31536000, immutable";
-        } else if (ext === ".png" || ext === ".jpg" || ext === ".jpeg" || ext === ".gif" || ext === ".svg" || ext === ".ico") {
+        } else if (
+          ext === ".png" ||
+          ext === ".jpg" ||
+          ext === ".jpeg" ||
+          ext === ".gif" ||
+          ext === ".svg" ||
+          ext === ".ico"
+        ) {
           // Cache images for a week
           headers["Cache-Control"] = "public, max-age=604800";
         } else {
@@ -214,7 +225,7 @@ This email was sent from the Bun Stack contact form.
     if (await distFile.exists()) {
       return new Response(distFile);
     }
-  } catch (e) {
+  } catch (_e) {
     // File doesn't exist, continue to serve index.html
   }
 
@@ -242,7 +253,7 @@ This email was sent from the Bun Stack contact form.
         }, 1000);
       </script>
     `;
-    html = html.replace("</body>", hmrScript + "</body>");
+    html = html.replace("</body>", `${hmrScript}</body>`);
   }
 
   const headers: Record<string, string> = {
@@ -255,22 +266,27 @@ This email was sent from the Bun Stack contact form.
     headers["X-Frame-Options"] = "DENY";
     headers["X-XSS-Protection"] = "1; mode=block";
     headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    headers["Permissions-Policy"] = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
-    headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';";
+    headers["Permissions-Policy"] =
+      "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()";
+    headers["Content-Security-Policy"] =
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';";
   }
 
   return new Response(html, { headers });
 }
 
 // Clean up old rate limit entries every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, limit] of rateLimitMap.entries()) {
-    if (now > limit.resetTime) {
-      rateLimitMap.delete(ip);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [ip, limit] of rateLimitMap.entries()) {
+      if (now > limit.resetTime) {
+        rateLimitMap.delete(ip);
+      }
     }
-  }
-}, 60 * 60 * 1000);
+  },
+  60 * 60 * 1000
+);
 
 const server = serve({
   port: process.env.PORT || 3001,

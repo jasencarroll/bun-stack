@@ -1,5 +1,5 @@
-import React from "react";
 import { CheckIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import React from "react";
 
 export function GetStarted() {
   const [copied, setCopied] = React.useState(false);
@@ -29,6 +29,7 @@ export function GetStarted() {
               <span className="text-green-400">$</span> {command}
             </code>
             <button
+              type="button"
               onClick={copyToClipboard}
               className="ml-4 p-2 hover:bg-white/10 rounded transition-colors"
               title="Copy to clipboard"
@@ -57,7 +58,8 @@ export function GetStarted() {
               <div>
                 <p className="font-semibold">Start developing</p>
                 <p className="text-gray-300 text-sm">
-                  Navigate to your project and run <code className="bg-black/50 px-2 py-1 rounded">bun run dev</code>
+                  Navigate to your project and run{" "}
+                  <code className="bg-black/50 px-2 py-1 rounded">bun run dev</code>
                 </p>
               </div>
             </div>
@@ -84,7 +86,7 @@ export function GetStarted() {
           >
             Don't have Bun? Install it here →
           </a>
-          
+
           <div className="pt-8 border-t border-gray-800">
             <h3 className="text-2xl font-bold mb-6">
               Ready to <span className="gradient-text">deploy</span>?

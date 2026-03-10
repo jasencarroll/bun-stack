@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import type { DocTreeItem } from "./DocsLayout";
 
 interface DocsSidebarProps {
@@ -47,6 +47,7 @@ export function DocsSidebar({ tree }: DocsSidebarProps) {
                 {item.name}
               </Link>
               <button
+                type="button"
                 onClick={() => toggleCategory(item.path)}
                 className={`
                   p-2 text-sm rounded-md
@@ -63,7 +64,7 @@ export function DocsSidebar({ tree }: DocsSidebarProps) {
             </div>
             {isExpanded && (
               <ul className="mt-1 ml-3 space-y-1">
-                {item.children.map((child) => renderItem(child, level + 1))}
+                {item.children?.map((child) => renderItem(child, level + 1))}
               </ul>
             )}
           </>
@@ -73,9 +74,10 @@ export function DocsSidebar({ tree }: DocsSidebarProps) {
             className={`
               group flex gap-x-3 rounded-md p-2 text-sm leading-6
               ${level > 0 ? "pl-9" : ""}
-              ${active 
-                ? "bg-white/10 text-bun-accent font-semibold" 
-                : "text-bun-light/70 hover:bg-white/5 hover:text-bun-accent"
+              ${
+                active
+                  ? "bg-white/10 text-bun-accent font-semibold"
+                  : "text-bun-light/70 hover:bg-white/5 hover:text-bun-accent"
               }
               transition-colors
             `}
@@ -90,9 +92,7 @@ export function DocsSidebar({ tree }: DocsSidebarProps) {
   return (
     <ul className="flex flex-1 flex-col gap-y-7">
       <li>
-        <ul className="-mx-2 space-y-1">
-          {tree.map((item) => renderItem(item))}
-        </ul>
+        <ul className="-mx-2 space-y-1">{tree.map((item) => renderItem(item))}</ul>
       </li>
     </ul>
   );

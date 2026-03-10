@@ -54,42 +54,39 @@ Collection of utility functions and helpers available throughout the application
 ### Common Imports
 
 ```typescript
-// Authentication
-import { generateToken, verifyToken } from "@/lib/jwt";
-import { hashPassword, verifyPassword } from "@/lib/crypto";
+// Authentication (all from src/lib/crypto.ts)
+import { generateToken, verifyToken, hashPassword, verifyPassword } from "@/lib/crypto";
 
 // Validation
 import { z } from "zod";
-import { validateBody, validateQuery } from "@/server/middleware/validation";
+import { validateRequest } from "@/server/middleware/validation";
 
-// Utilities
-import { cn } from "@/lib/utils";
-import { formatDate, formatCurrency } from "@/lib/utils";
+// Date utilities
+import { formatDate, formatDateTime, isToday } from "@/lib/date";
 
 // Database
 import { db } from "@/db/client";
-import { users, posts } from "@/db/schema";
+import { users } from "@/db/schema";
 
 // Middleware
 import { requireAuth, requireAdmin } from "@/server/middleware/auth";
-import { createRateLimit } from "@/server/middleware/rate-limit";
+import { createRateLimiter } from "@/server/middleware/rate-limit";
 ```
 
 ### Route Definition Pattern
 
 ```typescript
-// src/server/routes/example.ts
-export const example = {
-  "/": {
-    GET: handleList,
-    POST: [requireAuth, validateBody(schema), handleCreate],
-  },
+// src/server/routes/users.ts
+export const users = {
+  GET: async (req: Request) => { ... },
+  POST: async (req: Request) => { ... },
   "/:id": {
-    GET: handleGetOne,
-    PUT: [requireAuth, handleUpdate],
-    DELETE: [requireAuth, requireAdmin, handleDelete],
+    GET: async (req: Request & { params: { id: string } }) => { ... },
+    PUT: async (req: Request & { params: { id: string } }) => { ... },
+    DELETE: async (req: Request & { params: { id: string } }) => { ... },
   },
 };
+// Note: Auth middleware is applied imperatively in src/server/index.ts, not as arrays
 ```
 
 ### API Response Format
@@ -140,8 +137,7 @@ export const example = {
 ```typescript
 // Request handler types
 type RouteHandler = (
-  req: Request,
-  params?: { params: Record<string, string> }
+  req: Request & { params: Record<string, string> }
 ) => Promise<Response> | Response;
 
 type Middleware = (
@@ -194,48 +190,34 @@ JWT_SECRET=minimum-32-character-secret
 ```env
 # Server
 PORT=3000
-HOST=localhost
 
-# Security
-CORS_ORIGIN=https://example.com
-RATE_LIMIT_MAX=100
-CSRF_ENABLED=true
-
-# Features
-ENABLE_REGISTRATION=true
-ENABLE_API_DOCS=false
-
-# External Services
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASS=password
+# Database
+SQLITE_PATH=./db/app.db
 ```
 
 ## Error Handling
 
-### Error Classes
+The global error handler is the `error` callback in `Bun.serve()`, which returns plain text:
 
 ```typescript
-// Custom error classes
+// src/server/index.ts
+Bun.serve({
+  // ...
+  error(error) {
+    console.error(error);
+    return new Response("Internal Server Error", { status: 500 });
+  },
+});
+```
+
+> **Note:** The error classes and structured error handler below are recommended patterns not included in the generated template — create them as needed.
+
+```typescript
+// src/lib/errors.ts (not in template — create as needed)
 export class ValidationError extends Error {
   constructor(public errors: Record<string, string[]>) {
     super("Validation failed");
     this.name = "ValidationError";
-  }
-}
-
-export class AuthenticationError extends Error {
-  constructor(message = "Authentication required") {
-    super(message);
-    this.name = "AuthenticationError";
-  }
-}
-
-export class AuthorizationError extends Error {
-  constructor(message = "Insufficient permissions") {
-    super(message);
-    this.name = "AuthorizationError";
   }
 }
 
@@ -244,38 +226,6 @@ export class NotFoundError extends Error {
     super(`${resource} not found`);
     this.name = "NotFoundError";
   }
-}
-```
-
-### Global Error Handler
-
-```typescript
-export function handleError(error: unknown): Response {
-  console.error(error);
-  
-  if (error instanceof ValidationError) {
-    return Response.json({
-      error: "Validation failed",
-      details: error.errors,
-    }, { status: 422 });
-  }
-  
-  if (error instanceof AuthenticationError) {
-    return Response.json({
-      error: error.message,
-    }, { status: 401 });
-  }
-  
-  if (error instanceof NotFoundError) {
-    return Response.json({
-      error: error.message,
-    }, { status: 404 });
-  }
-  
-  // Default error
-  return Response.json({
-    error: "Internal server error",
-  }, { status: 500 });
 }
 ```
 

@@ -81,20 +81,18 @@ Complete testing setup with Bun's built-in test runner.
 
 ```typescript
 // src/server/routes/profile.ts
-import { requireAuth } from "../middleware/auth";
-
 export const profile = {
-  "/": {
-    GET: [
-      requireAuth,
-      async (req: Request) => {
-        const user = (req as any).user;
-        const profile = await profileRepository.findByUserId(user.id);
-        return Response.json(profile);
-      },
-    ],
+  GET: async (req: Request) => {
+    const user = req.user!;
+    const profile = await profileRepository.findByUserId(user.id);
+    return Response.json(profile);
   },
 };
+
+// Auth is applied imperatively in src/server/index.ts:
+// const authCheck = requireAuth(req);
+// if (authCheck) { response = authCheck; }
+// else { response = await handlers.GET(req); }
 ```
 
 ### Adding a New Database Model

@@ -7,8 +7,11 @@
     "build:css": "bunx tailwindcss -i ./src/app/index.css -o ./public/styles.css",
     "build:js": "bun build src/app/main.tsx --outdir=public --outfile=main.js",
     "typecheck": "bunx tsc --noEmit",
-    "format": "bunx prettier --write .",
-    "check": "bun run typecheck && bun run format",
+    "lint": "bunx biome check .",
+    "lint:fix": "bunx biome check --write .",
+    "format": "bunx biome format --write .",
+    "format:check": "bunx biome format .",
+    "check": "bun run typecheck && bun run lint && bun run format:check",
     "build": "bun run build:css && bun run build:js",
     "start": "bun src/server/index.ts"
   },
@@ -26,6 +29,7 @@
     "resend": "^4.6.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "@tailwindcss/typography": "^0.5.16",
     "@types/bun": "latest",
     "@types/lunr": "^2.3.7",
@@ -33,7 +37,6 @@
     "@types/prismjs": "^1.26.5",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "prettier": "^3.3.3",
     "tailwindcss": "^3.3.0",
     "typescript": "^5.5.0"
   },

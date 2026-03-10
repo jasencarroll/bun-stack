@@ -1,11 +1,10 @@
-import React from "react";
-import { 
-  LightBulbIcon, 
-  ChartBarIcon, 
-  CodeBracketIcon,
+import {
   BriefcaseIcon,
+  ChartBarIcon,
+  CodeBracketIcon,
+  LightBulbIcon,
+  RocketLaunchIcon,
   UserGroupIcon,
-  RocketLaunchIcon 
 } from "@heroicons/react/24/outline";
 
 export function AboutProject() {
@@ -28,13 +27,14 @@ export function AboutProject() {
               The Problem We Solved
             </h3>
             <p className="text-gray-300 mb-4">
-              JavaScript developers faced a critical gap: Rails offered unmatched productivity through 
-              convention over configuration, but the modern JS ecosystem lacked a comparable solution. 
-              Teams were spending hours on boilerplate setup instead of building features.
+              JavaScript developers faced a critical gap: Rails offered unmatched productivity
+              through convention over configuration, but the modern JS ecosystem lacked a comparable
+              solution. Teams were spending hours on boilerplate setup instead of building features.
             </p>
             <p className="text-gray-300">
-              By identifying this market need and leveraging Bun's performance advantages, we created 
-              a framework that delivers Rails-like productivity with modern JavaScript capabilities.
+              By identifying this market need and leveraging Bun's performance advantages, we
+              created a framework that delivers Rails-like productivity with modern JavaScript
+              capabilities.
             </p>
           </div>
 
@@ -108,7 +108,7 @@ export function AboutProject() {
             <span>AI Background</span>
           </div>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            Combining technical expertise with business acumen and AI insights to build tools that 
+            Combining technical expertise with business acumen and AI insights to build tools that
             accelerate software development for teams and startups.
           </p>
         </div>

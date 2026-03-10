@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ClipboardDocumentIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ClipboardDocumentIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
 
 interface CodeBlockProps {
   code: string;
@@ -25,10 +25,13 @@ export function CodeBlock({ code, language, filename }: CodeBlockProps) {
         </div>
       )}
       <div className={`relative ${filename ? "rounded-b-lg" : "rounded-lg"} overflow-hidden`}>
-        <pre className={`language-${language || "text"} bg-gray-900 text-gray-100 p-4 overflow-x-auto`}>
+        <pre
+          className={`language-${language || "text"} bg-gray-900 text-gray-100 p-4 overflow-x-auto`}
+        >
           <code dangerouslySetInnerHTML={{ __html: code }} />
         </pre>
         <button
+          type="button"
           onClick={handleCopy}
           className="absolute top-2 right-2 p-2 bg-gray-800 hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
           title="Copy code"

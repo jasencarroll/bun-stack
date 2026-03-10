@@ -1,6 +1,6 @@
-import { marked } from "marked";
+import { join } from "node:path";
 import matter from "gray-matter";
-import { join } from "path";
+import { marked } from "marked";
 
 export interface DocMeta {
   title: string;
@@ -42,11 +42,9 @@ export interface DocTreeItem {
 marked.setOptions({
   gfm: true,
   breaks: true,
-  langPrefix: 'language-',
 });
 
 export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
-
   const file = Bun.file(filePath);
   const content = await file.text();
 
@@ -56,17 +54,17 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
   // Create a new renderer instance for thread safety
   const localRenderer = new marked.Renderer();
   const localHeadings: { text: string; level: number; id: string }[] = [];
-  
+
   localRenderer.heading = function ({ tokens, depth }) {
     // Parse the tokens to get the text content
     const text = this.parser.parseInline(tokens);
-    
+
     // Strip HTML tags and emoji for the plain text version used in TOC
     let plainText = text
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/gu, '') // Remove common emoji ranges
+      .replace(/<[^>]*>/g, "") // Remove HTML tags
+      .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]/gu, "") // Remove common emoji ranges
       .trim();
-    
+
     // Decode HTML entities
     plainText = plainText
       .replace(/&#39;/g, "'")
@@ -75,24 +73,24 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&nbsp;/g, " ");
-    
+
     const id = plainText
       .toLowerCase()
       .replace(/[^\w\s-]/g, "")
       .replace(/\s+/g, "-");
-    
+
     localHeadings.push({ text: plainText, level: depth, id });
-    
+
     // Skip rendering H1 headings in content (they're shown in page header)
     if (depth === 1) {
-      return '';
+      return "";
     }
-    
+
     return `<h${depth} id="${id}" class="scroll-mt-20">${text}</h${depth}>`;
   };
 
   // Parse markdown to HTML
-  const html = marked(markdownContent, { renderer: localRenderer });
+  const html = await marked(markdownContent, { renderer: localRenderer });
 
   // Extract excerpt (first paragraph or first 200 chars)
   const excerptMatch = markdownContent.match(/^(.+?)(\n\n|$)/);
@@ -102,12 +100,12 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
 
   // Extract category and slug from file path
   const docsDir = join(import.meta.dir, "../../../docs");
-  const relativePath = filePath.replace(docsDir + "/", "");
+  const relativePath = filePath.replace(`${docsDir}/`, "");
   const parts = relativePath.split("/");
-  
+
   let category = "";
   let slug = "";
-  
+
   if (parts.length > 1) {
     category = parts[0];
     slug = parts[parts.length - 1].replace(/\.md$/, "");
@@ -144,54 +142,54 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDoc> {
 // Define category order
 const CATEGORY_ORDER: Record<string, number> = {
   "getting-started": 1,
-  "guide": 2,
-  "features": 3,
-  "api": 4,
-  "deployment": 5,
-  "advanced": 6,
+  guide: 2,
+  features: 3,
+  api: 4,
+  deployment: 5,
+  advanced: 6,
 };
 
 // Define document order within categories
 const DOC_ORDER: Record<string, Record<string, number>> = {
   "getting-started": {
-    "installation": 1,
+    installation: 1,
     "system-requirements": 2,
     "quick-start": 3,
     "first-app": 4,
   },
-  "guide": {
+  guide: {
     "project-structure": 1,
-    "configuration": 2,
+    configuration: 2,
     "admin-user": 3,
-    "development": 4,
-    "testing": 5,
-    "deployment": 6,
+    development: 4,
+    testing: 5,
+    deployment: 6,
   },
-  "features": {
-    "routing": 1,
-    "database": 2,
-    "authentication": 3,
-    "frontend": 4,
-    "security": 5,
-    "testing": 6,
+  features: {
+    routing: 1,
+    database: 2,
+    authentication: 3,
+    frontend: 4,
+    security: 5,
+    testing: 6,
   },
-  "api": {
-    "cli": 1,
+  api: {
+    cli: 1,
     "server-api": 2,
-    "middleware": 3,
-    "utilities": 4,
+    middleware: 3,
+    utilities: 4,
   },
-  "deployment": {
-    "docker": 1,
-    "railway": 2,
+  deployment: {
+    docker: 1,
+    railway: 2,
     "fly-io": 3,
-    "vps": 4,
+    vps: 4,
   },
-  "advanced": {
-    "customization": 1,
-    "performance": 2,
-    "migrations": 3,
-    "security": 4,
+  advanced: {
+    customization: 1,
+    performance: 2,
+    migrations: 3,
+    security: 4,
   },
 };
 
@@ -232,7 +230,7 @@ export async function getDocsTree(docsPath: string): Promise<DocTreeItem[]> {
         ...categoryReadme.meta,
         order: CATEGORY_ORDER[category] || categoryReadme.meta.order || 999,
       };
-    } catch (e) {
+    } catch (_e) {
       // No README or error reading it, use defaults
     }
 
@@ -242,7 +240,7 @@ export async function getDocsTree(docsPath: string): Promise<DocTreeItem[]> {
       meta: categoryMeta,
       children: [],
     };
-    
+
     categoryMap.set(category, categoryItem);
   }
 
@@ -265,7 +263,7 @@ export async function getDocsTree(docsPath: string): Promise<DocTreeItem[]> {
       // File in a category
       const category = parts[0];
       const filename = parts[parts.length - 1];
-      
+
       // Skip category README files (already used for category metadata)
       if (filename === "README.md") {
         continue;
@@ -276,8 +274,8 @@ export async function getDocsTree(docsPath: string): Promise<DocTreeItem[]> {
         // Get document order
         const docSlug = filename.replace(/\.md$/, "");
         const docOrder = DOC_ORDER[category]?.[docSlug] || parsed.meta.order || 999;
-        
-        categoryItem.children!.push({
+
+        categoryItem.children?.push({
           name: parsed.meta.title,
           path: file.replace(/\.md$/, ""),
           meta: {
@@ -293,7 +291,7 @@ export async function getDocsTree(docsPath: string): Promise<DocTreeItem[]> {
   tree.push(...Array.from(categoryMap.values()));
 
   // Sort tree items by order
-  const sortByOrder = (a: DocTreeItem, b: DocTreeItem) => 
+  const sortByOrder = (a: DocTreeItem, b: DocTreeItem) =>
     (a.meta.order || 999) - (b.meta.order || 999);
 
   tree.sort(sortByOrder);

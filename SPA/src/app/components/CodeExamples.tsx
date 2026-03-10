@@ -69,6 +69,7 @@ export function CodeExamples() {
           <div className="flex overflow-x-auto border-b border-gray-700">
             {examples.map((example, index) => (
               <button
+                type="button"
                 key={index}
                 onClick={() => setActiveTab(index)}
                 className={`px-6 py-3 whitespace-nowrap transition-colors ${

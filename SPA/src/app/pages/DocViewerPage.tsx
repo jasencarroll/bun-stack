@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { DocsContent } from "../components/docs/DocsContent";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { DocsContent } from "../components/docs/DocsContent";
 import { SEO } from "../components/SEO";
 import { StructuredData } from "../components/StructuredData";
 
@@ -23,7 +23,7 @@ export function DocViewerPage() {
 
   useEffect(() => {
     const docPath = slug ? `${category}/${slug}` : category;
-    
+
     if (!docPath) {
       setError("Invalid document path");
       setLoading(false);
@@ -105,17 +105,20 @@ export function DocViewerPage() {
     <>
       <SEO
         title={doc.meta.title}
-        description={doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`}
+        description={
+          doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`
+        }
         url={`https://bun-stack.jasenc.dev/docs/${slug ? `${category}/${slug}` : category}`}
       />
-      <StructuredData 
-        type="Article" 
+      <StructuredData
+        type="Article"
         customData={{
           title: doc.meta.title,
-          description: doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`,
+          description:
+            doc.meta.description || `Learn about ${doc.meta.title} in Bun Stack documentation`,
           url: `https://bun-stack.jasenc.dev/docs/${slug ? `${category}/${slug}` : category}`,
           datePublished: "2025-07-06",
-          dateModified: "2025-07-06"
+          dateModified: "2025-07-06",
         }}
       />
       <div>

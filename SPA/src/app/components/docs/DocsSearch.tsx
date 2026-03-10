@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import { DocumentIcon } from "@heroicons/react/24/outline";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface SearchResult {
   ref: string;
@@ -130,6 +130,7 @@ export function DocsSearch() {
           ) : results.length > 0 ? (
             results.map((result, index) => (
               <button
+                type="button"
                 key={result.ref}
                 className={`block w-full px-4 py-2 text-left text-sm ${
                   index === selectedIndex

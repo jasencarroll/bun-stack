@@ -502,14 +502,12 @@ railway variables set RAILWAY_SLEEP_AFTER=300  # 5 minutes
    ```typescript
    // src/server/routes/health.ts
    export const health = {
-     "/": {
-       GET: async () => {
-         const healthy = await checkDatabaseConnection();
-         return Response.json({
-           status: healthy ? "healthy" : "unhealthy",
-           timestamp: new Date().toISOString(),
-         });
-       },
+     GET: async () => {
+       const healthy = await checkDatabaseConnection();
+       return Response.json({
+         status: healthy ? "healthy" : "unhealthy",
+         timestamp: new Date().toISOString(),
+       });
      },
    };
    ```

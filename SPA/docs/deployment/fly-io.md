@@ -470,9 +470,8 @@ export const metrics = {
 ```typescript
 // src/server/routes/health.ts
 export const health = {
-  "/": {
-    GET: async () => {
-      const checks = {
+  GET: async () => {
+    const checks = {
         server: "healthy",
         database: await checkDatabase(),
         memory: process.memoryUsage(),
@@ -492,7 +491,6 @@ export const health = {
         },
         { status: healthy ? 200 : 503 }
       );
-    },
   },
 };
 ```
@@ -615,7 +613,9 @@ const sql = postgres(process.env.DATABASE_URL, {
 Bun.serve({
   port: 8080,
   compression: true,
-  fetch: router.fetch,
+  fetch(req) {
+    // Route handling logic from src/server/index.ts
+  },
 });
 ```
 

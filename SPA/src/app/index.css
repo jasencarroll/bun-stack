@@ -4,11 +4,7 @@
 
 @layer base {
   body {
-    font-family:
-      "Inter",
-      system-ui,
-      -apple-system,
-      sans-serif;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
   }
 
   /* Custom scrollbar */
@@ -50,7 +46,7 @@ code[class*="language-"],
 pre[class*="language-"] {
   color: #ccc;
   background: none;
-  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-family: Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace;
   font-size: 0.875rem;
   text-align: left;
   white-space: pre;
@@ -70,7 +66,7 @@ pre[class*="language-"] {
 /* Code blocks */
 pre[class*="language-"] {
   padding: 1em;
-  margin: .5em 0;
+  margin: 0.5em 0;
   overflow-x: auto;
   overflow-y: hidden;
   border-radius: 0.5rem;
@@ -98,8 +94,8 @@ pre[class*="language-"] {
 
 /* Inline code */
 :not(pre) > code[class*="language-"] {
-  padding: .1em .3em;
-  border-radius: .3em;
+  padding: 0.1em 0.3em;
+  border-radius: 0.3em;
   white-space: normal;
   background: #1a1a1a;
 }
@@ -182,55 +178,55 @@ pre[class*="language-"] {
 
 /* Fix code blocks to preserve line breaks and width constraints */
 .prose pre {
-  white-space: pre !important;
-  word-wrap: normal !important;
-  overflow-x: auto !important;
-  max-width: min(calc(100vw - 20rem), 90ch) !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: auto;
+  max-width: min(calc(100vw - 20rem), 90ch);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Responsive prose pre blocks */
 @media (max-width: 1024px) {
   .prose pre {
-    max-width: min(calc(100vw - 4rem), 80ch) !important;
+    max-width: min(calc(100vw - 4rem), 80ch);
   }
 }
 
 @media (max-width: 768px) {
   .prose pre {
-    max-width: min(calc(100vw - 2rem), 70ch) !important;
+    max-width: min(calc(100vw - 2rem), 70ch);
   }
 }
 
 .prose pre code {
-  white-space: pre !important;
-  word-break: normal !important;
-  overflow-wrap: normal !important;
-  display: block !important;
-  max-width: none !important;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  display: block;
+  max-width: none;
 }
 
 /* Ensure prose container doesn't exceed bounds */
 .prose {
-  max-width: none !important;
+  max-width: none;
   overflow-wrap: break-word;
 }
 
 /* Handle long URLs and inline code */
 .prose p code,
 .prose li code {
-  word-break: break-all !important;
-  max-width: 100% !important;
+  word-break: break-all;
+  max-width: 100%;
 }
 
 /* Responsive tables */
 .prose table {
-  width: 100% !important;
-  table-layout: auto !important;
-  overflow-x: auto !important;
-  display: block !important;
-  white-space: nowrap !important;
+  width: 100%;
+  table-layout: auto;
+  overflow-x: auto;
+  display: block;
+  white-space: nowrap;
 }
 
 /* Copy button for code blocks */

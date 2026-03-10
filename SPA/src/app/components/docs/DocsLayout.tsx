@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
-import { DocsSidebar } from "./DocsSidebar";
-import { DocsSearch } from "./DocsSearch";
-import { DocsBreadcrumb } from "./DocsBreadcrumb";
-import { Navigation } from "../Navigation";
-import { Footer } from "../Footer";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
+import { Footer } from "../Footer";
+import { Navigation } from "../Navigation";
+import { DocsBreadcrumb } from "./DocsBreadcrumb";
+import { DocsSearch } from "./DocsSearch";
+import { DocsSidebar } from "./DocsSidebar";
 
 export interface DocTreeItem {
   name: string;
@@ -48,7 +48,7 @@ export function DocsLayout() {
   return (
     <div className="min-h-screen bg-bun-dark text-bun-light">
       <Navigation />
-      
+
       <div className="pt-16 flex">
         {/* Mobile sidebar toggle */}
         <div className="fixed top-20 left-4 z-40 lg:hidden">
@@ -64,7 +64,12 @@ export function DocsLayout() {
 
         {/* Mobile sidebar */}
         <div className={`relative z-50 lg:hidden ${sidebarOpen ? "" : "hidden"}`}>
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
           <div className="fixed inset-0 flex">
             <div className="relative mr-16 flex w-full max-w-xs flex-1">
               <div className="absolute left-full top-0 flex w-16 justify-center pt-5">

@@ -1,18 +1,18 @@
+import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export function Navigation() {
   const [isOpen, setIsOpen] = React.useState(false);
   const navigate = useNavigate();
 
   const handleSectionLink = (sectionId: string) => {
-    navigate('/');
+    navigate("/");
     // Small delay to ensure navigation completes before scrolling
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        element.scrollIntoView({ behavior: "smooth" });
       }
     }, 100);
   };
@@ -32,19 +32,39 @@ export function Navigation() {
               <Link to="/docs" className="hover:text-bun-accent transition-colors font-semibold">
                 Docs
               </Link>
-              <button onClick={() => handleSectionLink('features')} className="hover:text-bun-accent transition-colors">
+              <button
+                type="button"
+                onClick={() => handleSectionLink("features")}
+                className="hover:text-bun-accent transition-colors"
+              >
                 Features
               </button>
-              <button onClick={() => handleSectionLink('comparison')} className="hover:text-bun-accent transition-colors">
+              <button
+                type="button"
+                onClick={() => handleSectionLink("comparison")}
+                className="hover:text-bun-accent transition-colors"
+              >
                 Compare
               </button>
-              <button onClick={() => handleSectionLink('examples')} className="hover:text-bun-accent transition-colors">
+              <button
+                type="button"
+                onClick={() => handleSectionLink("examples")}
+                className="hover:text-bun-accent transition-colors"
+              >
                 Examples
               </button>
-              <button onClick={() => handleSectionLink('philosophy')} className="hover:text-bun-accent transition-colors">
+              <button
+                type="button"
+                onClick={() => handleSectionLink("philosophy")}
+                className="hover:text-bun-accent transition-colors"
+              >
                 Mission
               </button>
-              <button onClick={() => handleSectionLink('contact')} className="hover:text-bun-accent transition-colors">
+              <button
+                type="button"
+                onClick={() => handleSectionLink("contact")}
+                className="hover:text-bun-accent transition-colors"
+              >
                 Contact
               </button>
               <a
@@ -64,7 +84,8 @@ export function Navigation() {
                 Portfolio
               </a>
               <button
-                onClick={() => handleSectionLink('get-started')}
+                type="button"
+                onClick={() => handleSectionLink("get-started")}
                 className="bg-bun-accent text-bun-dark px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
               >
                 Get Started
@@ -74,6 +95,7 @@ export function Navigation() {
 
           <div className="md:hidden">
             <button
+              type="button"
               onClick={() => setIsOpen(!isOpen)}
               className="text-bun-light hover:text-bun-accent"
               aria-label={isOpen ? "Close menu" : "Open menu"}
@@ -89,25 +111,61 @@ export function Navigation() {
       {isOpen && (
         <div className="md:hidden glass-effect">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link to="/docs" className="block px-3 py-2 hover:text-bun-accent transition-colors font-semibold" onClick={() => setIsOpen(false)}>
+            <Link
+              to="/docs"
+              className="block px-3 py-2 hover:text-bun-accent transition-colors font-semibold"
+              onClick={() => setIsOpen(false)}
+            >
               Docs
             </Link>
-            <button onClick={() => { handleSectionLink('features'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                handleSectionLink("features");
+                setIsOpen(false);
+              }}
+              className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
+            >
               Features
             </button>
             <button
-              onClick={() => { handleSectionLink('comparison'); setIsOpen(false); }}
+              type="button"
+              onClick={() => {
+                handleSectionLink("comparison");
+                setIsOpen(false);
+              }}
               className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
             >
               Compare
             </button>
-            <button onClick={() => { handleSectionLink('examples'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                handleSectionLink("examples");
+                setIsOpen(false);
+              }}
+              className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
+            >
               Examples
             </button>
-            <button onClick={() => { handleSectionLink('philosophy'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                handleSectionLink("philosophy");
+                setIsOpen(false);
+              }}
+              className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
+            >
               Mission
             </button>
-            <button onClick={() => { handleSectionLink('contact'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                handleSectionLink("contact");
+                setIsOpen(false);
+              }}
+              className="block w-full text-left px-3 py-2 hover:text-bun-accent transition-colors"
+            >
               Contact
             </button>
             <a
@@ -125,7 +183,11 @@ export function Navigation() {
               Portfolio
             </a>
             <button
-              onClick={() => { handleSectionLink('get-started'); setIsOpen(false); }}
+              type="button"
+              onClick={() => {
+                handleSectionLink("get-started");
+                setIsOpen(false);
+              }}
               className="block w-full text-left px-3 py-2 bg-bun-accent text-bun-dark rounded-lg font-semibold text-center"
             >
               Get Started

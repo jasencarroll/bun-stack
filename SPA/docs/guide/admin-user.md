@@ -93,17 +93,15 @@ The role-based access control is enforced by the `requireAdmin` middleware in th
 
 ### Middleware Protection
 
-Admin routes are protected by the `requireAdmin` middleware:
+Admin routes are protected by the `requireAdmin` middleware, applied imperatively in `src/server/index.ts`:
 
 ```typescript
-import { requireAdmin } from "../middleware/auth";
-
-export const adminRoutes = {
-  "/users": {
-    GET: [requireAdmin, getAllUsers],
-    POST: [requireAdmin, createUser],
-  },
-};
+// In the Bun.serve fetch handler (src/server/index.ts):
+if (req.method === "GET" && path === "/api/users") {
+  const adminCheck = requireAdmin(req);
+  if (adminCheck) { response = adminCheck; }
+  else { response = await handlers.GET(req); }
+}
 ```
 
 ## Troubleshooting

@@ -6,56 +6,61 @@ This reference covers the server-side API structure, route definitions, and requ
 
 ### Basic Structure
 
-Routes are defined as objects with HTTP methods as keys:
+Route files export objects with HTTP methods as keys. Top-level methods (GET, POST) sit directly on the object, while parameterized routes use path keys:
 
 ```typescript
-// src/server/routes/example.ts
-export const example = {
-  "/": {
-    GET: handleGet,
-    POST: handlePost,
-    PUT: handlePut,
-    DELETE: handleDelete,
-    PATCH: handlePatch,
-  },
+// src/server/routes/users.ts
+export const users = {
+  // Top-level handlers (for /api/users)
+  GET: async (req: Request) => { ... },
+  POST: async (req: Request) => { ... },
+
+  // Parameterized routes (for /api/users/:id)
   "/:id": {
-    GET: handleGetById,
-    PUT: handleUpdate,
-    DELETE: handleDeleteById,
-  },
-  "/:id/nested": {
-    GET: handleNestedGet,
+    GET: async (req: Request & { params: { id: string } }) => { ... },
+    PUT: async (req: Request & { params: { id: string } }) => { ... },
+    DELETE: async (req: Request & { params: { id: string } }) => { ... },
   },
 };
 ```
 
 ### Route Registration
 
-Register routes in the main router:
+Routes are wired imperatively in `src/server/index.ts` using `if` statements (there is no `router.ts` or `createRouter`):
 
 ```typescript
-// src/server/router.ts
-import { auth } from "./routes/auth";
-import { users } from "./routes/users";
-import { products } from "./routes/products";
+// src/server/index.ts
+import * as routes from "./routes";
 
-const routes = {
-  "/api/auth": auth,
-  "/api/users": users,
-  "/api/products": products,
-};
+// Inside Bun.serve fetch handler:
+if (path.startsWith("/api/auth")) {
+  const handlers = routes.auth;
+  if (path === "/api/auth/login" && req.method === "POST") {
+    response = await handlers["/login"].POST(req);
+  }
+  // ...
+}
 
-export const router = createRouter(routes);
+if (path.startsWith("/api/users")) {
+  const handlers = routes.users;
+  if (req.method === "GET" && path === "/api/users") {
+    const adminCheck = requireAdmin(req);
+    if (adminCheck) { response = adminCheck; }
+    else { response = await handlers.GET(req); }
+  }
+  // ...
+}
 ```
 
 ## Request Handling
 
 ### Handler Signature
 
+Route parameters are accessed via a type intersection on the request object:
+
 ```typescript
 type RouteHandler = (
-  req: Request,
-  params?: { params: Record<string, string> }
+  req: Request & { params: Record<string, string> }
 ) => Promise<Response> | Response;
 ```
 
@@ -64,13 +69,15 @@ type RouteHandler = (
 The standard Web API `Request` object with additional properties:
 
 ```typescript
-interface ExtendedRequest extends Request {
-  // Added by middleware
-  user?: User;              // From auth middleware
-  validatedBody?: any;      // From validation middleware
-  validatedQuery?: any;     // From query validation
-  securityHeaders?: Headers; // From security middleware
+// Added by auth middleware (declared globally in src/server/middleware/auth.ts)
+declare global {
+  interface Request {
+    user?: AuthUser; // From requireAuth middleware
+  }
 }
+
+// Route params added via Object.assign in index.ts
+type RequestWithParams = Request & { params: Record<string, string> };
 ```
 
 ### Accessing Request Data
@@ -108,18 +115,19 @@ async function handleRequest(req: Request) {
 
 ### Route Parameters
 
+Route parameters are accessed via the `req.params` property using a type intersection:
+
 ```typescript
 // Route definition
 "/:category/:id": {
   GET: handleGetItem,
 }
 
-// Handler
+// Handler — params are on req via type intersection
 async function handleGetItem(
-  req: Request,
-  { params }: { params: { category: string; id: string } }
+  req: Request & { params: { category: string; id: string } }
 ) {
-  const { category, id } = params;
+  const { category, id } = req.params;
   // Use parameters
 }
 ```
@@ -221,36 +229,30 @@ type Middleware = (
 
 ### Applying Middleware
 
+Middleware is applied imperatively in `src/server/index.ts`, not as arrays in route definitions:
+
 ```typescript
-// Single middleware
-export const users = {
-  "/": {
-    GET: [requireAuth, handleGetUsers],
-  },
-};
+// In the Bun.serve fetch handler (src/server/index.ts)
 
-// Multiple middleware
-export const admin = {
-  "/": {
-    POST: [
-      requireAuth,
-      requireAdmin,
-      validateBody(createUserSchema),
-      handleCreateUser,
-    ],
-  },
-};
+// Auth check before route handler
+if (req.method === "GET" && path === "/api/users") {
+  const adminCheck = requireAdmin(req);
+  if (adminCheck) {
+    response = adminCheck; // Short-circuit on auth failure
+  } else {
+    response = await handlers.GET(req);
+  }
+}
 
-// Conditional middleware
-const rateLimitedAuth = process.env.NODE_ENV === "production"
-  ? [rateLimit, requireAuth]
-  : [requireAuth];
+// Rate limiting in route handlers (src/server/routes/auth.ts)
+POST: async (req: Request) => {
+  const rateLimitResponse = authRateLimiter(req);
+  if (rateLimitResponse) return rateLimitResponse;
 
-export const sensitive = {
-  "/": {
-    POST: [...rateLimitedAuth, handleSensitiveAction],
-  },
-};
+  const body = await validateRequest(req, loginSchema);
+  if (body instanceof Response) return body;
+  // ... handle login
+}
 ```
 
 ### Middleware Flow
@@ -295,32 +297,30 @@ async function authMiddleware(req: Request): Promise<Response | null> {
 // Response: { token, user, csrfToken }
 
 // POST /api/auth/logout
-// Headers: Authorization: Bearer <token>
-// Response: { message: "Logged out" }
-
-// GET /api/auth/me
-// Headers: Authorization: Bearer <token>
-// Response: { user }
+// Response: { message: "Logged out successfully" }
 ```
 
 ### Users
 
 ```typescript
-// GET /api/users
+// GET /api/users (admin only)
 // Headers: Authorization: Bearer <token>
-// Query: ?page=1&limit=10&search=john
-// Response: { data: User[], total, page, limit }
+// Response: User[] (password fields stripped)
 
-// GET /api/users/:id
+// GET /api/users/:id (auth required)
 // Headers: Authorization: Bearer <token>
-// Response: User
+// Response: User (password field stripped)
 
-// PUT /api/users/:id
+// POST /api/users
+// Body: { name, email, password? }
+// Response: User (201, password field stripped)
+
+// PUT /api/users/:id (admin only)
 // Headers: Authorization: Bearer <token>
-// Body: { name, email }
-// Response: User
+// Body: { name?, email?, password?, role? }
+// Response: User (password field stripped)
 
-// DELETE /api/users/:id
+// DELETE /api/users/:id (admin only)
 // Headers: Authorization: Bearer <token>
 // Response: 204 No Content
 ```
@@ -329,108 +329,86 @@ async function authMiddleware(req: Request): Promise<Response | null> {
 
 ```typescript
 // GET /api/health
-// Response: {
-//   status: "healthy",
+// Response (production):
+// { status: "ok", timestamp: "2024-01-01T00:00:00Z" }
+//
+// Response (development only - additional fields):
+// {
+//   status: "ok",
 //   timestamp: "2024-01-01T00:00:00Z",
+//   database: { status: "connected", responseTime: 5 },
 //   version: "1.0.0",
-//   uptime: 3600
+//   environment: "development"
 // }
 ```
 
 ## Error Handling
 
-### Error Response Format
+### Error Response Formats
+
+The template uses two error formats depending on the source:
 
 ```typescript
-interface ErrorResponse {
-  error: string;          // Main error message
-  message?: string;       // Detailed message
-  code?: string;          // Error code
-  field?: string;         // Field that caused error
-  details?: any;          // Additional details
-  timestamp: string;      // ISO timestamp
-  requestId?: string;     // Request tracking ID
-}
+// Validation errors (from validateRequest with Zod)
+{ errors: ZodIssue[] }
+
+// General errors (from middleware and handlers)
+{ error: string }
+
+// Some 404s return plain text
+"User not found"
 ```
 
 ### Standard Error Responses
 
 ```typescript
-// 400 Bad Request
+// 400 Bad Request (validation — from validateRequest)
 {
-  "error": "Validation failed",
-  "details": {
-    "email": "Invalid email format",
-    "password": "Password too short"
-  }
+  "errors": [
+    { "code": "invalid_type", "message": "Expected string", "path": ["email"] }
+  ]
 }
 
 // 401 Unauthorized
 {
-  "error": "Unauthorized",
-  "message": "Invalid or expired token"
+  "error": "Unauthorized"
+}
+
+// 401 Invalid token
+{
+  "error": "Invalid token"
 }
 
 // 403 Forbidden
 {
-  "error": "Forbidden",
-  "message": "Admin access required"
+  "error": "Forbidden - Admin access required"
 }
 
-// 404 Not Found
-{
-  "error": "Not found",
-  "message": "User not found"
-}
+// 404 Not Found (user endpoints return plain text)
+"User not found"
 
 // 429 Too Many Requests
 {
-  "error": "Too many requests",
-  "message": "Rate limit exceeded",
-  "retryAfter": 3600
+  "error": "Too many requests, please try again later"
 }
 
-// 500 Internal Server Error
-{
-  "error": "Internal server error",
-  "message": "An unexpected error occurred",
-  "requestId": "req_123456"
-}
+// 500 Internal Server Error (plain text from Bun.serve error handler)
+"Internal Server Error"
 ```
 
 ### Error Handler
 
+The global error handler is the `error` callback in `Bun.serve()`. It returns plain text, not JSON:
+
 ```typescript
-// Global error handler
-export function errorHandler(error: unknown): Response {
-  console.error(error);
-  
-  if (error instanceof ValidationError) {
-    return Response.json(
-      {
-        error: "Validation failed",
-        details: error.errors,
-      },
-      { status: 400 }
-    );
-  }
-  
-  if (error instanceof UnauthorizedError) {
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-  
-  // Default error
-  return Response.json(
-    {
-      error: "Internal server error",
-      timestamp: new Date().toISOString(),
-    },
-    { status: 500 }
-  );
-}
+// src/server/index.ts
+Bun.serve({
+  // ...
+  error(error) {
+    console.error(error);
+    return new Response("Internal Server Error", { status: 500 });
+  },
+});
 ```
 
 ## Request Validation
@@ -541,10 +519,9 @@ async function handleUpload(req: Request) {
 ```typescript
 // Stream large files
 async function downloadFile(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request & { params: { id: string } }
 ) {
-  const file = await fileRepo.findById(params.id);
+  const file = await fileRepo.findById(req.params.id);
   if (!file) {
     return Response.json({ error: "File not found" }, { status: 404 });
   }
@@ -563,19 +540,21 @@ async function downloadFile(
 
 ## WebSocket Support
 
+> **Note:** WebSocket support is not included in the generated template. The example below shows how to add it using Bun's built-in WebSocket API.
+
 ### WebSocket Handler
 
 ```typescript
-// src/server/websocket.ts
+// src/server/websocket.ts (not in template — create as needed)
 export const websocketHandler = {
   open(ws: ServerWebSocket) {
     console.log("WebSocket opened");
     ws.send(JSON.stringify({ type: "connected" }));
   },
-  
+
   message(ws: ServerWebSocket, message: string | Buffer) {
     const data = JSON.parse(message.toString());
-    
+
     switch (data.type) {
       case "ping":
         ws.send(JSON.stringify({ type: "pong" }));
@@ -588,7 +567,7 @@ export const websocketHandler = {
         break;
     }
   },
-  
+
   close(ws: ServerWebSocket) {
     console.log("WebSocket closed");
   },
@@ -597,7 +576,11 @@ export const websocketHandler = {
 // In server setup
 Bun.serve({
   port: 3000,
-  fetch: router.fetch,
+  fetch(req, server) {
+    // Upgrade WebSocket requests
+    if (server.upgrade(req)) return;
+    // ... regular HTTP handling
+  },
   websocket: websocketHandler,
 });
 ```
@@ -607,40 +590,43 @@ Bun.serve({
 ### Rate Limit Configuration
 
 ```typescript
-// Per-route rate limiting
-const authRateLimit = createRateLimit({
+// src/server/middleware/rate-limit.ts
+// Pre-configured rate limiters
+export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 requests per window
-  message: "Too many attempts",
-  keyGenerator: (req) => getClientIp(req),
+  message: "Too many authentication attempts, please try again later",
 });
 
-const apiRateLimit = createRateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  skipIf: (req) => {
-    const user = (req as any).user;
-    return user?.role === "admin";
-  },
+export const strictAuthRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 requests per hour
+  message: "Too many failed login attempts, please try again later",
 });
 ```
 
 ## CORS Configuration
 
-### CORS Options
+### CORS Implementation
+
+The template uses two exported functions — `applyCorsHeaders` and `handleCorsPreflightRequest`:
 
 ```typescript
-const corsOptions = {
-  origin: (origin: string) => {
-    const allowed = ["http://localhost:3000", "https://myapp.com"];
-    return allowed.includes(origin);
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
-  exposedHeaders: ["X-Total-Count", "X-Page"],
-  credentials: true,
-  maxAge: 86400, // 24 hours
-};
+// src/server/middleware/cors.ts
+const ALLOWED_ORIGINS =
+  env.NODE_ENV === "production"
+    ? ["https://yourdomain.com"]
+    : [
+        `http://localhost:${PORT}`,
+        `http://localhost:${Number(PORT) + 1}`,
+        `http://127.0.0.1:${PORT}`,
+      ];
+
+const ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
+const ALLOWED_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token"];
+
+export function applyCorsHeaders(response: Response, origin: string | null): Response { ... }
+export function handleCorsPreflightRequest(req: Request): Response | null { ... }
 ```
 
 ## API Versioning

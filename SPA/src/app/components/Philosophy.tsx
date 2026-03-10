@@ -1,5 +1,5 @@
 // Bun Stack: open-sourced competence at scale
-import React from "react";
+
 import { LockOpenIcon } from "@heroicons/react/24/outline";
 
 export function Philosophy() {
@@ -9,11 +9,14 @@ export function Philosophy() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 flex items-center justify-center gap-3">
             <LockOpenIcon className="h-10 w-10 text-bun-accent" />
-            <span>Open-Sourced <span className="gradient-text">Leverage</span></span>
+            <span>
+              Open-Sourced <span className="gradient-text">Leverage</span>
+            </span>
           </h2>
-          
+
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            Bun Stack is more than a fullstack starter — it's everything you'd build if you had the time.
+            Bun Stack is more than a fullstack starter — it's everything you'd build if you had the
+            time.
           </p>
         </div>
 
@@ -59,20 +62,27 @@ export function Philosophy() {
 
         <div className="text-center space-y-6">
           <h3 className="text-2xl font-semibold">
-            Built by <a href="https://jasenc.dev" className="gradient-text hover:opacity-80 transition-opacity" target="_blank" rel="noopener noreferrer">Jasen</a>
+            Built by{" "}
+            <a
+              href="https://jasenc.dev"
+              className="gradient-text hover:opacity-80 transition-opacity"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Jasen
+            </a>
           </h3>
-          
+
           <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8 max-w-2xl mx-auto space-y-4">
-            <p className="text-gray-300">
-              Engineer. Systems thinker. MBA. DX evangelist.
-            </p>
-            
+            <p className="text-gray-300">Engineer. Systems thinker. MBA. DX evangelist.</p>
+
             <blockquote className="border-l-4 border-bun-accent pl-4">
               <p className="text-gray-300 italic">
-                I built Bun Stack to curate an open-source experience that gives everyone the leverage to ship production apps — instantly.
+                I built Bun Stack to curate an open-source experience that gives everyone the
+                leverage to ship production apps — instantly.
               </p>
             </blockquote>
-            
+
             <p className="text-xl font-semibold text-white">
               Now it's yours. <span className="gradient-text">Just ship.</span>
             </p>

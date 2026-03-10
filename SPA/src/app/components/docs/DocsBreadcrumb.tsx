@@ -1,6 +1,5 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
 import { ChevronRightIcon, HomeIcon } from "@heroicons/react/20/solid";
+import { Link, useLocation } from "react-router-dom";
 
 export function DocsBreadcrumb() {
   const location = useLocation();
@@ -12,7 +11,7 @@ export function DocsBreadcrumb() {
   }
 
   const breadcrumbs = pathSegments.slice(1).map((segment, index) => {
-    const path = "/" + pathSegments.slice(0, index + 2).join("/");
+    const path = `/${pathSegments.slice(0, index + 2).join("/")}`;
     const name = segment
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))

@@ -195,7 +195,7 @@ export default {
     : "better-sqlite",
   dbCredentials: process.env.DATABASE_URL
     ? { connectionString: process.env.DATABASE_URL }
-    : { url: "./app.db" },
+    : { url: process.env.SQLITE_PATH || "db/app.db" },
 } satisfies Config;
 ```
 

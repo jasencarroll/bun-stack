@@ -80,14 +80,12 @@ src/server/
 │   ├── health.ts       # Health check
 │   └── users.ts        # User management
 ├── config.ts           # Server configuration
-├── index.ts            # Server entry point
-└── router.ts           # Route registration
+└── index.ts            # Server entry point & route registration
 ```
 
 #### Key Backend Files
 
-- **`index.ts`**: Bun server setup and static file serving
-- **`router.ts`**: Central route registration
+- **`index.ts`**: Bun server setup, route registration, and static file serving
 - **`middleware/auth.ts`**: JWT verification and user context
 
 ### `/src/db` - Database Layer
@@ -304,7 +302,7 @@ Available aliases:
 ### Adding Middleware
 
 1. Create in `/src/server/middleware/`
-2. Apply in `/src/server/router.ts`
+2. Apply in `/src/server/index.ts`
 3. Test middleware behavior
 4. Document usage
 

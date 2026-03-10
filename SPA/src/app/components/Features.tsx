@@ -1,10 +1,9 @@
-import React from "react";
 import {
+  BeakerIcon,
   BoltIcon,
-  ShieldCheckIcon,
   CircleStackIcon,
   CubeIcon,
-  BeakerIcon,
+  ShieldCheckIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
 
@@ -12,32 +11,38 @@ const features = [
   {
     icon: BoltIcon,
     title: "10x Faster Setup",
-    description: "Powered by Bun's lightning-fast runtime. Install dependencies 10x faster than npm. Start your server in <10ms.",
+    description:
+      "Powered by Bun's lightning-fast runtime. Install dependencies 10x faster than npm. Start your server in <10ms.",
   },
   {
     icon: CubeIcon,
     title: "Full-Stack Execution",
-    description: "Frontend to infrastructure - everything configured. Reduces project setup from hours to seconds, enforcing best practices across teams.",
+    description:
+      "Frontend to infrastructure - everything configured. Reduces project setup from hours to seconds, enforcing best practices across teams.",
   },
   {
     icon: ShieldCheckIcon,
     title: "Enterprise-Ready Security",
-    description: "CSRF protection, secure headers, and JWT auth built-in. Meet compliance requirements without the configuration overhead.",
+    description:
+      "CSRF protection, secure headers, and JWT auth built-in. Meet compliance requirements without the configuration overhead.",
   },
   {
     icon: CircleStackIcon,
     title: "Flexible Architecture",
-    description: "PostgreSQL for production, SQLite for development. Easily extensible for GraphQL, WebSockets, or custom solutions.",
+    description:
+      "PostgreSQL for production, SQLite for development. Easily extensible for GraphQL, WebSockets, or custom solutions.",
   },
   {
     icon: BeakerIcon,
     title: "Quality Assurance",
-    description: "Integration tests that actually work. Reduce QA cycles and improve team confidence with pre-configured testing.",
+    description:
+      "Integration tests that actually work. Reduce QA cycles and improve team confidence with pre-configured testing.",
   },
   {
     icon: SparklesIcon,
     title: "Developer Productivity",
-    description: "Hot reload, TypeScript, and modern tooling. Onboard new team members in minutes, not days.",
+    description:
+      "Hot reload, TypeScript, and modern tooling. Onboard new team members in minutes, not days.",
   },
 ];
 

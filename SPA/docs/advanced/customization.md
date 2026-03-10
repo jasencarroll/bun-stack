@@ -108,15 +108,14 @@ export function customMiddleware(
 }
 ```
 
-Use the middleware:
+Use the middleware imperatively in `src/server/index.ts`:
 
 ```typescript
-// src/server/router.ts
-import { customMiddleware } from "./middleware/custom";
-
-const enhancedRouter = {
-  fetch: customMiddleware(router.fetch),
-};
+// In the Bun.serve fetch handler, apply before route handlers:
+const customCheck = await customMiddleware(req);
+if (customCheck) {
+  response = customCheck;
+}
 ```
 
 ### Custom Route Handlers
@@ -167,12 +166,10 @@ export function createPaginatedHandler<T>(
 
 // Use in routes
 export const users = {
-  "/": {
-    GET: createPaginatedHandler(
-      (limit, offset) => userRepo.findAll({ limit, offset }),
-      () => userRepo.count()
-    ),
-  },
+  GET: createPaginatedHandler(
+    (limit, offset) => userRepo.findAll({ limit, offset }),
+    () => userRepo.count()
+  ),
 };
 ```
 
